@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "120466030887",
+    "project_id": "kouisine-e2984",
+    "storage_bucket": "kouisine-e2984.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:120466030887:android:43503853df3ee218b32902",
+        "android_client_info": {
+          "package_name": "com.kouisine"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDquqwJ3ByNkHRPaq3lMyURXxUpI9BOojM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

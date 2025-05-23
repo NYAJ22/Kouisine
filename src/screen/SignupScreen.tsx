@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Image,
   Alert,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
@@ -75,9 +76,9 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
 
       <Text style={styles.socialText}>Connectez-vous via</Text>
       <View style={styles.socialIcons}>
-        <Text>Google</Text>
-        <Text>Facebook</Text>
-        <Text>Instagram</Text>
+        <Image source={require('../assets/google.png')} style={styles.icon} />
+        <Image source={require('../assets/facebook.png')} style={styles.icon} />
+        <Image source={require('../assets/instagram.png')} style={styles.icon} />
       </View>
     </View>
   );
@@ -88,6 +89,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     justifyContent: 'center',
+    backgroundColor: '#f8f2e7',
   },
   title: {
     fontSize: 28,
@@ -132,6 +134,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginTop: 10,
+  },
+  icon: {
+    width: 30,
+    height: 30,
   },
 });
 

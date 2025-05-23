@@ -25,6 +25,7 @@ const LoginScreen: React.FC = () => {
       .signInWithEmailAndPassword(email, password)
       .then(() => {
         Alert.alert('Connexion réussie !');
+        navigation.navigate('Home');
         // navigation.navigate('Home');
       })
       .catch(error => {

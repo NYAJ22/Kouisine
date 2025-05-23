@@ -1,23 +1,43 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { View, StyleSheet, ActivityIndicator, Animated } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/Navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
 const SplashScreen: React.FC<Props> = ({ navigation }) => {
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      navigation.replace('Login'); // ou 'Home' selon ta logique
-    }, 2000); // splash de 2 secondes
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [isLoading, setIsLoading] = useState(true);
 
-    return () => clearTimeout(timeout);
+  const startAnimation = useCallback(() => {
+    Animated.sequence([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+      }),
+      Animated.delay(800), // Pause pour laisser voir l'animation
+    ]).start(() => setIsLoading(false));
+  }, [fadeAnim]);
+
+  const navigateToLogin = useCallback(() => {
+    navigation.replace('Login'); // ou 'Home'
   }, [navigation]);
+
+  useEffect(() => {
+    startAnimation();
+    const timeout = setTimeout(navigateToLogin, 2500); // 2.5s total
+    return () => clearTimeout(timeout);
+  }, [startAnimation, navigateToLogin]);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🍲 KOUISINE</Text>
-      <ActivityIndicator size="large" color="#2d7d5e" style={styles.loader} />
+      <Animated.Text style={[styles.title, { opacity: fadeAnim }]}>
+        🍲 KOUISINE
+      </Animated.Text>
+      {isLoading && (
+        <ActivityIndicator size="large" color="#2d7d5e" style={styles.loader} />
+      )}
     </View>
   );
 };
@@ -30,9 +50,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 32,
+    fontSize: 48,
     fontWeight: 'bold',
     color: '#2d7d5e',
+    letterSpacing: 3,
+    textAlign: 'center',
+    textTransform: 'uppercase',
   },
   loader: {
     marginTop: 20,

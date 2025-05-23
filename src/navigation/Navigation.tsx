@@ -9,14 +9,18 @@ import SignupScreen from '../screen/SignupScreen';
 import ShoppingListScreen from '../screen/ShoppingListScreen';
 import MealPlanningScreen from '../screen/MealPlanningScreen';
 import FridgeScreen from '../screen/FridgeScreen';
+import BudgetScreen from '../screen/BudgetScreen';
+import SplashScreen from '../screen/SplashScreen';
 
 export type RootStackParamList = {
+  Splash: undefined;
   Login: undefined;
   Home: undefined;
   Signup: undefined;
   ShoppingList: undefined;
   MealPlanning: undefined;
   Fridge: undefined;
+  Statistics: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -24,13 +28,15 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const Navigation = () => {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
+      <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Signup" component={SignupScreen} />
         <Stack.Screen name="ShoppingList" component={ShoppingListScreen} />
         <Stack.Screen name="MealPlanning" component={MealPlanningScreen} />
         <Stack.Screen name="Fridge" component={FridgeScreen} />
+        <Stack.Screen name="Statistics" component={BudgetScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

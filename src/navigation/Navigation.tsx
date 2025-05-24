@@ -3,14 +3,15 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import LoginScreen from '../screen/LoginScreen'; // adapter le chemin selon ton projet
-import HomeScreen from '../screen/HomeScreen'; // adapter le chemin selon ton projet
+import LoginScreen from '../screen/LoginScreen';
+import HomeScreen from '../screen/HomeScreen';
 import SignupScreen from '../screen/SignupScreen';
 import ShoppingListScreen from '../screen/ShoppingListScreen';
 import MealPlanningScreen from '../screen/MealPlanningScreen';
 import FridgeScreen from '../screen/FridgeScreen';
 import BudgetScreen from '../screen/BudgetScreen';
 import SplashScreen from '../screen/SplashScreen';
+import ProfileScreen from '../screen/ProfileScreen';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -21,6 +22,7 @@ export type RootStackParamList = {
   MealPlanning: undefined;
   Fridge: undefined;
   Statistics: undefined;
+  ProfileUser: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -37,6 +39,7 @@ const Navigation = () => {
         <Stack.Screen name="MealPlanning" component={MealPlanningScreen} />
         <Stack.Screen name="Fridge" component={FridgeScreen} />
         <Stack.Screen name="Statistics" component={BudgetScreen} />
+        <Stack.Screen name="ProfileUser" component={ProfileScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

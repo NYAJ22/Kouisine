@@ -32,7 +32,9 @@ const BudgetScreen = () => {
     const loadExpenses = async () => {
       try {
         const data = await AsyncStorage.getItem(STORAGE_KEY);
-        if (data) setExpenses(JSON.parse(data));
+        if (data) {
+          setExpenses(JSON.parse(data));
+        }
       } catch (err) {
         console.error('Erreur de chargement du budget :', err);
       }

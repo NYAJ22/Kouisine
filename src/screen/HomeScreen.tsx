@@ -8,6 +8,8 @@ import {
   ScrollView,
   StatusBar,
   Alert,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
 
@@ -26,7 +28,9 @@ interface HomeScreenProps {
   navigation: NavigationProp<any>;
 }
 
-type QuickActionType = 'shopping' | 'planning' | 'stock' | 'stats';
+type QuickActionType = 'shopping' | 'planning' | 'stock' | 'stats' | 'profile';
+
+const { width } = Dimensions.get('window');
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [currentDate, setCurrentDate] = useState<string>('');
@@ -41,6 +45,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     { name: 'Bananes', days: 0 },
   ]);
 
+  // Animations
+  const fadeAnim = React.useRef(new Animated.Value(0));
+  const slideAnim = React.useRef(new Animated.Value(50));
+
   useEffect(() => {
     // Formatage de la date actuelle
     const today = new Date();
@@ -51,6 +59,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       day: 'numeric',
     };
     setCurrentDate(today.toLocaleDateString('fr-FR', options));
+
+    // Animation d'entrée
+    Animated.parallel([
+      Animated.timing(fadeAnim.current, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim.current, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   const handleQuickAction = (action: QuickActionType): void => {
@@ -67,6 +89,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       case 'stats':
         navigation.navigate('Statistics');
         break;
+      case 'profile':
+        navigation.navigate('ProfileUser');
+        break;
       default:
         Alert.alert('Navigation', `Aller vers ${action}`);
     }
@@ -74,12 +99,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const getExpirationColor = (days: number): string => {
     if (days === 0) {
-      return '#e74c3c'; // Rouge - Expiré
+      return '#FF6B6B';
     }
     if (days <= 2) {
-      return '#f39c12'; // Orange - Bientôt expiré
+      return '#FFB347';
     }
-    return '#27ae60'; // Vert - OK
+    return '#4ECDC4';
   };
 
   const getExpirationText = (days: number): string => {
@@ -98,134 +123,189 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2d7d5e" />
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <Text style={styles.logoText}>🍽️</Text>
+      <StatusBar barStyle="light-content" backgroundColor="#1A5D4A" />
+      {/* Header avec gradient */}
+      <View style={styles.headerGradient}>
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <View style={styles.logo}>
+              <Text style={styles.logoText}>🍽️</Text>
+            </View>
+            <View>
+              <Text style={styles.appName}>KOUISINE</Text>
+              <Text style={styles.appSubtitle}>Votre assistant culinaire</Text>
+            </View>
           </View>
-          <Text style={styles.appName}>KOUISINE</Text>
+          <TouchableOpacity style={styles.profileButton} onPress={handleProfilePress}>
+            <Text style={styles.profileIcon}>👤</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.profileButton} onPress={handleProfilePress}>
-          <Text style={styles.profileIcon}>👤</Text>
-        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Date du jour */}
-        <View style={styles.dateContainer}>
-          <Text style={styles.dateText}>{currentDate}</Text>
-          <Text style={styles.welcomeText}>Bonjour ! Que cuisinez-vous aujourd'hui ?</Text>
-        </View>
-
-        {/* Résumé du jour */}
-        <View style={styles.todaySummary}>
-          <Text style={styles.sectionTitle}>Aujourd'hui</Text>
-          {/* Repas prévus */}
-          <View style={styles.mealsContainer}>
-            <View style={styles.mealCard}>
-              <Text style={styles.mealType}>🌅 Déjeuner</Text>
-              <Text style={styles.mealName}>{todayMeals.lunch}</Text>
-            </View>
-            <View style={styles.mealCard}>
-              <Text style={styles.mealType}>🌙 Dîner</Text>
-              <Text style={styles.mealName}>{todayMeals.dinner}</Text>
-            </View>
-          </View>
-
-          {/* Infos rapides */}
-          <View style={styles.quickInfoContainer}>
-            <View style={styles.quickInfoCard}>
-              <Text style={styles.quickInfoNumber}>{shoppingListCount}</Text>
-              <Text style={styles.quickInfoLabel}>Articles sur ma liste</Text>
-            </View>
-            <View style={styles.quickInfoCard}>
-              <Text style={styles.quickInfoNumber}>{expiringItems.length}</Text>
-              <Text style={styles.quickInfoLabel}>Produits à surveiller</Text>
+        <Animated.View
+          style={[
+            styles.animatedContainer,
+            {
+              opacity: fadeAnim.current,
+              transform: [{ translateY: slideAnim.current }],
+            },
+          ]}
+        >
+          {/* Hero Section */}
+          <View style={styles.heroSection}>
+            <Text style={styles.dateText}>{currentDate}</Text>
+            <Text style={styles.welcomeText}>Bonjour ! Que cuisinez-vous aujourd'hui ?</Text>
+            <View style={styles.heroStats}>
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatNumber}>{shoppingListCount}</Text>
+                <Text style={styles.heroStatLabel}>Articles à acheter</Text>
+              </View>
+              <View style={styles.heroDivider} />
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatNumber}>{expiringItems.length}</Text>
+                <Text style={styles.heroStatLabel}>À surveiller</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Alertes d'expiration */}
-        {expiringItems.length > 0 && (
-          <View style={styles.alertsContainer}>
-            <Text style={styles.sectionTitle}>⚠️ À surveiller</Text>
-            {expiringItems.slice(0, 3).map((item: ExpiringItem, index: number) => (
-              <View key={index} style={styles.alertItem}>
-                <View style={styles.alertInfo}>
-                  <Text style={styles.alertItemName}>{item.name}</Text>
-                  <Text style={[
-                    styles.alertItemExpiry,
-                    { color: getExpirationColor(item.days) },
-                  ]}>
-                    {getExpirationText(item.days)}
-                  </Text>
+          {/* Repas du jour - Design carte amélioré */}
+          <View style={styles.todayMealsSection}>
+            <Text style={styles.sectionTitle}>Vos repas d'aujourd'hui</Text>
+            <View style={styles.mealsContainer}>
+              <View style={styles.mealCard}>
+                <View style={styles.mealCardHeader}>
+                  <Text style={styles.mealEmoji}>☀️</Text>
+                  <Text style={styles.mealType}>Déjeuner</Text>
                 </View>
-                <View style={[
-                  styles.alertIndicator,
-                  { backgroundColor: getExpirationColor(item.days) },
-                ]} />
+                <Text style={styles.mealName}>{todayMeals.lunch}</Text>
+                <View style={styles.mealCardFooter}>
+                  <TouchableOpacity style={styles.mealActionButton}>
+                    <Text style={styles.mealActionText}>Voir recette</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            ))}
+              <View style={styles.mealCard}>
+                <View style={styles.mealCardHeader}>
+                  <Text style={styles.mealEmoji}>🌙</Text>
+                  <Text style={styles.mealType}>Dîner</Text>
+                </View>
+                <Text style={styles.mealName}>{todayMeals.dinner}</Text>
+                <View style={styles.mealCardFooter}>
+                  <TouchableOpacity style={styles.mealActionButton}>
+                    <Text style={styles.mealActionText}>Voir recette</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
           </View>
-        )}
 
-        {/* Actions rapides */}
-        <View style={styles.quickActionsContainer}>
-          <Text style={styles.sectionTitle}>Actions rapides</Text>
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity
-              style={styles.quickActionCard}
-              onPress={() => handleQuickAction('shopping')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.quickActionIcon}>
-                <Text style={styles.quickActionEmoji}>📝</Text>
+          {/* Alertes d'expiration - Design moderne */}
+          {expiringItems.length > 0 && (
+            <View style={styles.alertsContainer}>
+              <View style={styles.alertsHeader}>
+                <Text style={styles.sectionTitle}>⚠️ Produits à surveiller</Text>
+                <TouchableOpacity style={styles.viewAllButton}>
+                  <Text style={styles.viewAllText}>Tout voir</Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.quickActionTitle}>Ma liste</Text>
-              <Text style={styles.quickActionSubtitle}>de courses</Text>
-            </TouchableOpacity>
+              {expiringItems.slice(0, 3).map((item: ExpiringItem, index: number) => (
+                <View key={index} style={styles.alertItem}>
+                  <View style={styles.alertIconContainer}>
+                    <View style={[
+                      styles.alertIcon,
+                      { backgroundColor: getExpirationColor(item.days) + '20' },
+                    ]}>
+                      <View style={[
+                        styles.alertDot,
+                        { backgroundColor: getExpirationColor(item.days) },
+                      ]} />
+                    </View>
+                  </View>
+                  <View style={styles.alertInfo}>
+                    <Text style={styles.alertItemName}>{item.name}</Text>
+                    <Text style={[
+                      styles.alertItemExpiry,
+                      { color: getExpirationColor(item.days) },
+                    ]}>
+                      {getExpirationText(item.days)}
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={styles.alertAction}>
+                    <Text style={styles.alertActionText}>→</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
 
-            <TouchableOpacity
-              style={styles.quickActionCard}
-              onPress={() => handleQuickAction('planning')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.quickActionIcon}>
-                <Text style={styles.quickActionEmoji}>🍽️</Text>
-              </View>
-              <Text style={styles.quickActionTitle}>Planning</Text>
-              <Text style={styles.quickActionSubtitle}>des repas</Text>
-            </TouchableOpacity>
+          {/* Actions rapides - Grid améliorée */}
+          <View style={styles.quickActionsContainer}>
+            <Text style={styles.sectionTitle}>Actions rapides</Text>
+            <View style={styles.quickActionsGrid}>
+              <TouchableOpacity
+                style={[styles.quickActionCard, styles.shoppingCard]}
+                onPress={() => handleQuickAction('shopping')}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.quickActionIcon, styles.shoppingIcon]}>
+                  <Text style={styles.quickActionEmoji}>📝</Text>
+                </View>
+                <Text style={styles.quickActionTitle}>Ma liste</Text>
+                <Text style={styles.quickActionSubtitle}>de courses</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.quickActionCard}
-              onPress={() => handleQuickAction('stock')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.quickActionIcon}>
-                <Text style={styles.quickActionEmoji}>🥫</Text>
-              </View>
-              <Text style={styles.quickActionTitle}>Mon stock</Text>
-              <Text style={styles.quickActionSubtitle}>& frigo</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickActionCard, styles.planningCard]}
+                onPress={() => handleQuickAction('planning')}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.quickActionIcon, styles.planningIcon]}>
+                  <Text style={styles.quickActionEmoji}>📅</Text>
+                </View>
+                <Text style={styles.quickActionTitle}>Planning</Text>
+                <Text style={styles.quickActionSubtitle}>des repas</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.quickActionCard}
-              onPress={() => handleQuickAction('stats')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.quickActionIcon}>
-                <Text style={styles.quickActionEmoji}>📊</Text>
-              </View>
-              <Text style={styles.quickActionTitle}>Statistiques</Text>
-              <Text style={styles.quickActionSubtitle}>& budget</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickActionCard, styles.stockCard]}
+                onPress={() => handleQuickAction('stock')}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.quickActionIcon, styles.stockIcon]}>
+                  <Text style={styles.quickActionEmoji}>🥫</Text>
+                </View>
+                <Text style={styles.quickActionTitle}>Mon stock</Text>
+                <Text style={styles.quickActionSubtitle}>& frigo</Text>
+              </TouchableOpacity>
 
+              <TouchableOpacity
+                style={[styles.quickActionCard, styles.statsCard]}
+                onPress={() => handleQuickAction('stats')}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.quickActionIcon, styles.statsIcon]}>
+                  <Text style={styles.quickActionEmoji}>📊</Text>
+                </View>
+                <Text style={styles.quickActionTitle}>Statistiques</Text>
+                <Text style={styles.quickActionSubtitle}>& budget</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
 
+          {/* Section inspiration */}
+          <View style={styles.inspirationSection}>
+            <Text style={styles.sectionTitle}>💡 Inspiration du jour</Text>
+            <View style={styles.inspirationCard}>
+              <Text style={styles.inspirationText}>
+                "Cuisiner avec amour transforme les ingrédients les plus simples en moments précieux."
+              </Text>
+              <TouchableOpacity style={styles.inspirationButton}>
+                <Text style={styles.inspirationButtonText}>Découvrir une recette</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -234,148 +314,238 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f2e7',
+    backgroundColor: '#F8F9FA',
+  },
+  headerGradient: {
+    backgroundColor: '#1A5D4A',
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
   header: {
-    backgroundColor: '#2d7d5e',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: 24,
+    paddingTop: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   logo: {
-    width: 40,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   logoText: {
-    fontSize: 20,
+    fontSize: 22,
   },
   appName: {
     color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  appSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    fontWeight: '400',
+    marginTop: 2,
   },
   profileButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   profileIcon: {
-    fontSize: 18,
+    fontSize: 20,
     color: 'white',
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
   },
-  dateContainer: {
-    marginTop: 20,
-    marginBottom: 25,
+  animatedContainer: {
+    flex: 1,
+  },
+  heroSection: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    marginTop: -12,
+    marginBottom: 24,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
   dateText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2d7d5e',
-    marginBottom: 5,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A5D4A',
+    marginBottom: 8,
     textTransform: 'capitalize',
   },
   welcomeText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  heroStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  heroStatNumber: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1A5D4A',
+  },
+  heroStatLabel: {
+    fontSize: 13,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  heroDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#E9ECEF',
+    marginHorizontal: 20,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#333',
-    marginBottom: 15,
+    marginBottom: 16,
   },
-  todaySummary: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
+  todayMealsSection: {
+    marginBottom: 24,
   },
   mealsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    gap: 12,
   },
   mealCard: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 15,
-    marginHorizontal: 5,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+  },
+  mealCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  mealEmoji: {
+    fontSize: 20,
+    marginRight: 8,
   },
   mealType: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
-    marginBottom: 5,
+    fontWeight: '600',
   },
   mealName: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#333',
+    marginBottom: 16,
+    lineHeight: 22,
   },
-  quickInfoContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+  mealCardFooter: {
+    alignItems: 'flex-start',
   },
-  quickInfoCard: {
-    alignItems: 'center',
+  mealActionButton: {
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
-  quickInfoNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2d7d5e',
-  },
-  quickInfoLabel: {
+  mealActionText: {
     fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 5,
+    color: '#1A5D4A',
+    fontWeight: '600',
   },
   alertsContainer: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
-    marginBottom: 20,
-    elevation: 2,
+    marginBottom: 24,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
-  alertItem: {
+  alertsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  viewAllButton: {
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  viewAllText: {
+    fontSize: 12,
+    color: '#1A5D4A',
+    fontWeight: '600',
+  },
+  alertItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#F1F3F4',
+  },
+  alertIconContainer: {
+    marginRight: 16,
+  },
+  alertIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  alertDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   alertInfo: {
     flex: 1,
@@ -384,60 +554,127 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 4,
   },
   alertItemExpiry: {
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 13,
+    fontWeight: '500',
   },
-  alertIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+  alertAction: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F8F9FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  alertActionText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '600',
   },
   quickActionsContainer: {
-    marginBottom: 30,
+    marginBottom: 24,
   },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 12,
   },
   quickActionCard: {
-    width: '48%',
+    width: (width - 52) / 2,
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     alignItems: 'center',
-    marginBottom: 15,
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+  },
+  shoppingCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF6B6B',
+  },
+  planningCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#4ECDC4',
+  },
+  stockCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#45B7D1',
+  },
+  statsCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#96CEB4',
   },
   quickActionIcon: {
-    width: 50,
-    height: 50,
-    backgroundColor: '#f4d03f',
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
+  shoppingIcon: {
+    backgroundColor: '#FF6B6B20',
+  },
+  planningIcon: {
+    backgroundColor: '#4ECDC420',
+  },
+  stockIcon: {
+    backgroundColor: '#45B7D120',
+  },
+  statsIcon: {
+    backgroundColor: '#96CEB420',
+  },
   quickActionEmoji: {
-    fontSize: 24,
+    fontSize: 26,
   },
   quickActionTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2d7d5e',
+    fontWeight: '700',
+    color: '#333',
     textAlign: 'center',
+    marginBottom: 4,
   },
   quickActionSubtitle: {
     fontSize: 12,
     color: '#666',
     textAlign: 'center',
-    marginTop: 2,
+    fontWeight: '500',
+  },
+  inspirationSection: {
+    marginBottom: 32,
+  },
+  inspirationCard: {
+    backgroundColor: '#1A5D4A',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  inspirationText: {
+    fontSize: 16,
+    color: 'white',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    lineHeight: 24,
+    marginBottom: 20,
+  },
+  inspirationButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  inspirationButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

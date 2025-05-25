@@ -12,6 +12,8 @@ import FridgeScreen from '../screen/FridgeScreen';
 import BudgetScreen from '../screen/BudgetScreen';
 import SplashScreen from '../screen/SplashScreen';
 import ProfileScreen from '../screen/ProfileScreen';
+import OnboardingScreen from '../screen/OnboardingScreen';
+import FamilySetup from '../screen/FamilySetup';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -22,7 +24,9 @@ export type RootStackParamList = {
   MealPlanning: undefined;
   Fridge: undefined;
   Statistics: undefined;
+  Onboarding: undefined;
   ProfileUser: undefined;
+  FamilySetup: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -39,7 +43,9 @@ const Navigation = () => {
         <Stack.Screen name="MealPlanning" component={MealPlanningScreen} />
         <Stack.Screen name="Fridge" component={FridgeScreen} />
         <Stack.Screen name="Statistics" component={BudgetScreen} />
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="ProfileUser" component={ProfileScreen} />
+        <Stack.Screen name="FamilySetup" component={FamilySetup} />
       </Stack.Navigator>
     </NavigationContainer>
   );

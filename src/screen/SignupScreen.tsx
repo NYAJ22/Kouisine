@@ -7,10 +7,12 @@ import {
   StyleSheet,
   Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
+//import firestore from '@react-native-firebase/firestore';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/Navigation'; // adapte ce chemin selon ton projet
+import { RootStackParamList } from '../navigation/Navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Signup'>;
 
@@ -18,22 +20,71 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const handleSignup = () => {
+  const validateInputs = (): boolean => {
+    if (!email.trim()) {
+      Alert.alert('Erreur', 'Veuillez saisir une adresse e-mail.');
+      return false;
+    }
+
+    if (!password.trim()) {
+      Alert.alert('Erreur', 'Veuillez saisir un mot de passe.');
+      return false;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères.');
+      return false;
+    }
+
     if (password !== confirmPassword) {
       Alert.alert('Erreur', 'Les mots de passe ne correspondent pas.');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSignup = async (): Promise<void> => {
+    if (!validateInputs()) {
       return;
     }
 
-    auth()
-      .createUserWithEmailAndPassword(email, password)
-      .then(() => {
-        Alert.alert('Succès', 'Compte créé avec succès !');
-        navigation.navigate('Login');
-      })
-      .catch(error => {
-        Alert.alert('Erreur', error.message);
-      });
+    setIsLoading(true);
+
+    try {
+      console.log('Début de l\'inscription...');
+
+      // Créer le compte utilisateur
+      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+      const user = userCredential.user;
+
+      console.log('Utilisateur créé:', user.uid);
+
+      console.log('Navigation vers Onboarding...');
+      // Navigation directe vers Onboarding sans Alert
+      navigation.replace('Onboarding');
+
+    } catch (error: any) {
+      console.error('Erreur lors de l\'inscription:', error);
+
+      let errorMessage = 'Une erreur est survenue lors de l\'inscription.';
+
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'Cette adresse e-mail est déjà utilisée.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Adresse e-mail invalide.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Le mot de passe est trop faible.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      Alert.alert('Erreur', errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -48,6 +99,7 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
         style={styles.input}
         keyboardType="email-address"
         autoCapitalize="none"
+        editable={!isLoading}
       />
       <TextInput
         placeholder="Mot de passe"
@@ -55,6 +107,7 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
         secureTextEntry
         onChangeText={setPassword}
         style={styles.input}
+        editable={!isLoading}
       />
       <TextInput
         placeholder="Confirmer le mot de passe"
@@ -62,15 +115,24 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
         secureTextEntry
         onChangeText={setConfirmPassword}
         style={styles.input}
+        editable={!isLoading}
       />
 
-      <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
-        <Text style={styles.buttonText}>S'inscrire</Text>
+      <TouchableOpacity
+        style={[styles.signupButton, isLoading && styles.disabledButton]}
+        onPress={handleSignup}
+        disabled={isLoading}>
+        {isLoading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>S'inscrire</Text>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.loginButton}
-        onPress={() => navigation.navigate('Login')}>
+        onPress={() => navigation.navigate('Login')}
+        disabled={isLoading}>
         <Text style={styles.buttonText}>Connexion</Text>
       </TouchableOpacity>
 
@@ -107,12 +169,16 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     borderRadius: 10,
+    backgroundColor: '#fff',
   },
   signupButton: {
     backgroundColor: '#A98F60',
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   loginButton: {
     backgroundColor: '#fff',

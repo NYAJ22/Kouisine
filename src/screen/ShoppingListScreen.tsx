@@ -16,6 +16,7 @@ import { NavigationProp } from '@react-navigation/native';
 interface ShoppingItem {
   id: string;
   name: string;
+  completed?: boolean;
 }
 
 interface ShoppingListScreenProps {
@@ -24,11 +25,11 @@ interface ShoppingListScreenProps {
 
 const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _navigation }) => {
   const [items, setItems] = useState<ShoppingItem[]>([
-    { id: '1', name: 'Pommes' },
-    { id: '2', name: 'Pain' },
-    { id: '3', name: 'Œufs' },
+    { id: '1', name: 'Pommes', completed: false },
+    { id: '2', name: 'Pain', completed: false },
+    { id: '3', name: 'Œufs', completed: true },
   ]);
-  const [newItem, setNewItem] = useState<string>('');
+  const [newItem, setNewItem] = useState('');
 
   const addItem = () => {
     const trimmed = newItem.trim();
@@ -45,6 +46,7 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
     const item: ShoppingItem = {
       id: Date.now().toString(),
       name: trimmed,
+      completed: false,
     };
 
     setItems([...items, item]);
@@ -52,10 +54,16 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
     Keyboard.dismiss();
   };
 
+  const toggleItem = (id: string) => {
+    setItems(items.map(item =>
+      item.id === id ? { ...item, completed: !item.completed } : item
+    ));
+  };
+
   const removeItem = (id: string) => {
     Alert.alert(
-      'Supprimer',
-      'Voulez-vous supprimer cet article ?',
+      'Supprimer l\'article',
+      'Êtes-vous sûr de vouloir supprimer cet article ?',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -67,42 +75,84 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
     );
   };
 
+  const completedCount = items.filter(item => item.completed).length;
+  const totalCount = items.length;
+
   const renderItem = ({ item }: { item: ShoppingItem }) => (
-    <View style={styles.itemRow}>
-      <Text style={styles.itemText}>• {item.name}</Text>
-      <TouchableOpacity onPress={() => removeItem(item.id)} style={styles.deleteButton}>
+    <TouchableOpacity
+      style={[styles.itemRow, item.completed && styles.itemRowCompleted]}
+      onPress={() => toggleItem(item.id)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.itemContent}>
+        <View style={[styles.checkbox, item.completed && styles.checkboxCompleted]}>
+          {item.completed && <Text style={styles.checkmark}>✓</Text>}
+        </View>
+        <Text style={[styles.itemText, item.completed && styles.itemTextCompleted]}>
+          {item.name}
+        </Text>
+      </View>
+      <TouchableOpacity
+        onPress={() => removeItem(item.id)}
+        style={styles.deleteButton}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
         <Text style={styles.deleteButtonText}>🗑️</Text>
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2d7d5e" />
+      <StatusBar barStyle="light-content" backgroundColor="#1A5D4A" />
+      {/* Header avec gradient effect */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>📝 Ma Liste de Courses</Text>
+        <Text style={styles.headerTitle}>🛒 Ma Liste de Courses</Text>
+        <Text style={styles.headerSubtitle}>
+          {completedCount}/{totalCount} articles complétés
+        </Text>
       </View>
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          value={newItem}
-          onChangeText={setNewItem}
-          placeholder="Ajouter un article..."
-          placeholderTextColor="#aaa"
-          style={styles.input}
-          onSubmitEditing={addItem}
-        />
-        <TouchableOpacity onPress={addItem} style={styles.addButton}>
-          <Text style={styles.addButtonText}>＋</Text>
-        </TouchableOpacity>
+      {/* Section d'ajout */}
+      <View style={styles.inputSection}>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            value={newItem}
+            onChangeText={setNewItem}
+            placeholder="Ajouter un nouvel article..."
+            placeholderTextColor="#999"
+            returnKeyType="done"
+            onSubmitEditing={addItem}
+          />
+          <TouchableOpacity
+            onPress={addItem}
+            style={styles.addButton}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.addButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <FlatList
-        data={items}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-      />
+      {/* Liste des articles */}
+      <View style={styles.listSection}>
+        {items.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateIcon}>📝</Text>
+            <Text style={styles.emptyStateText}>Votre liste est vide</Text>
+            <Text style={styles.emptyStateSubtext}>Ajoutez votre premier article ci-dessus</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={item => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 };
@@ -110,67 +160,166 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f2e7',
+    backgroundColor: '#f5f7fa',
   },
   header: {
-    backgroundColor: '#2d7d5e',
-    padding: 20,
-    alignItems: 'center',
+    backgroundColor: '#1A5D4A',
+    paddingHorizontal: 20,
+    paddingVertical: 25,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   headerTitle: {
     color: 'white',
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  headerSubtitle: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  inputSection: {
+    backgroundColor: 'white',
+    margin: 20,
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 20,
+    padding: 15,
     alignItems: 'center',
   },
   input: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#f8f9fa',
     paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
     fontSize: 16,
-    elevation: 2,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   addButton: {
-    backgroundColor: '#2d7d5e',
-    marginLeft: 10,
-    padding: 12,
-    borderRadius: 8,
-    elevation: 2,
+    backgroundColor: '#28a745',
+    marginLeft: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#28a745',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   addButtonText: {
     color: 'white',
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
   },
-  listContent: {
+  listSection: {
+    flex: 1,
     paddingHorizontal: 20,
-    paddingBottom: 30,
+  },
+  listContent: {
+    paddingBottom: 20,
   },
   itemRow: {
     flexDirection: 'row',
     backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     marginBottom: 10,
     justifyContent: 'space-between',
     alignItems: 'center',
-    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4a90e2',
+  },
+  itemRowCompleted: {
+    backgroundColor: '#f8f9fa',
+    borderLeftColor: '#28a745',
+    opacity: 0.8,
+  },
+  itemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#dee2e6',
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+  },
+  checkboxCompleted: {
+    backgroundColor: '#28a745',
+    borderColor: '#28a745',
+  },
+  checkmark: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   itemText: {
     fontSize: 16,
     color: '#333',
+    flex: 1,
+  },
+  itemTextCompleted: {
+    textDecorationLine: 'line-through',
+    color: '#6c757d',
   },
   deleteButton: {
-    padding: 5,
+    padding: 8,
+    borderRadius: 8,
   },
   deleteButtonText: {
     fontSize: 18,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 60,
+  },
+  emptyStateIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    color: '#6c757d',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#adb5bd',
+    textAlign: 'center',
   },
 });
 

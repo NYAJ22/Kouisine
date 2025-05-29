@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/Navigation';
-//import firestore from '@react-native-firebase/firestore';
+import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 
 const { width, height } = Dimensions.get('window');
@@ -178,9 +178,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
   const finishOnboarding = async (): Promise<void> => {
     const uid = auth().currentUser?.uid;
     if (uid) {
-      /*await firestore().collection('users').doc(uid).update({
+      await firestore().collection('users').doc(uid).update({
         hasCompletedOnboarding: true,
-      });*/
+      });
       navigation.replace('FamilySetup');
     } else {
       navigation.replace('Login');

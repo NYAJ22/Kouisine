@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
-//import firestore from '@react-native-firebase/firestore';
+import firestore from '@react-native-firebase/firestore';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/Navigation';
 
@@ -61,6 +61,14 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
       const user = userCredential.user;
 
       console.log('Utilisateur créé:', user.uid);
+
+      // Créer le document utilisateur dans Firestore
+      await firestore().collection('users').doc(user.uid).set({
+        email: user.email,
+        hasCompletedOnboarding: false,
+        familyMembers: [],
+        createdAt: firestore.FieldValue.serverTimestamp(),
+      });
 
       console.log('Navigation vers Onboarding...');
       // Navigation directe vers Onboarding sans Alert

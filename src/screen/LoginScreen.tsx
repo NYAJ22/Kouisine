@@ -11,7 +11,7 @@ import {
 import auth from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/Navigation'; // adapte le chemin selon ta structure
+import type { RootStackParamList } from '../navigation/Navigation';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
@@ -26,7 +26,6 @@ const LoginScreen: React.FC = () => {
       .then(() => {
         Alert.alert('Connexion réussie !');
         navigation.navigate('Home');
-        // navigation.navigate('Home');
       })
       .catch(error => {
         Alert.alert('Erreur', error.message);

@@ -11,8 +11,8 @@ import {
   StatusBar,
   ScrollView,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import uuid from 'react-native-uuid';
+import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
 
 type FridgeItem = {
   id: string;
@@ -23,7 +23,6 @@ type FridgeItem = {
   dateAdded: string;
 };
 
-const STORAGE_KEY = '@fridge_items';
 
 // Catégories d'aliments avec emojis et couleurs
 const FOOD_CATEGORIES = [
@@ -46,31 +45,19 @@ const FridgeScreen = () => {
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const json = await AsyncStorage.getItem(STORAGE_KEY);
-        if (json) {
-          setItems(JSON.parse(json));
-        }
-      } catch (err) {
-        console.error('Erreur de chargement :', err);
-      }
-    };
-    loadData();
+    const uid = auth().currentUser?.uid;
+    if (!uid) return;
+    const unsubscribe = firestore()
+      .collection('users')
+      .doc(uid)
+      .collection('fridge')
+      .onSnapshot(snapshot => {
+        setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FridgeItem)));
+      });
+    return unsubscribe;
   }, []);
 
-  useEffect(() => {
-    const saveData = async () => {
-      try {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-      } catch (err) {
-        console.error('Erreur de sauvegarde :', err);
-      }
-    };
-    saveData();
-  }, [items]);
-
-  const addItem = () => {
+  const addItem = async () => {
     if (!name || !quantity || !expiryDate || !selectedCategory) {
       Alert.alert('Erreur', 'Tous les champs sont obligatoires.');
       return;
@@ -82,16 +69,14 @@ const FridgeScreen = () => {
       return;
     }
 
-    const newItem: FridgeItem = {
-      id: uuid.v4() as string,
-      name: name.trim(),
-      quantity: quantity.trim(),
-      expiryDate,
-      category: selectedCategory,
-      dateAdded: new Date().toLocaleDateString('fr-FR'),
-    };
+    const uid = auth().currentUser?.uid;
+    if (!uid) return;
+    await firestore()
+      .collection('users')
+      .doc(uid)
+      .collection('fridge')
+      .add({ name, quantity, expiryDate, category: selectedCategory, dateAdded: new Date().toLocaleDateString('fr-FR') });
 
-    setItems((prev) => [newItem, ...prev]);
     setName('');
     setQuantity('');
     setExpiryDate('');
@@ -99,15 +84,15 @@ const FridgeScreen = () => {
     setSelectedCategoryIndex(null);
   };
 
-  const deleteItem = (id: string) => {
-    Alert.alert('Supprimer l\'aliment', 'Êtes-vous sûr de vouloir supprimer cet aliment ?', [
-      { text: 'Annuler', style: 'cancel' },
-      {
-        text: 'Supprimer',
-        style: 'destructive',
-        onPress: () => setItems((prev) => prev.filter((item) => item.id !== id)),
-      },
-    ]);
+  const deleteItem = async (id: string) => {
+    const uid = auth().currentUser?.uid;
+    if (!uid) return;
+    await firestore()
+      .collection('users')
+      .doc(uid)
+      .collection('fridge')
+      .doc(id)
+      .delete();
   };
 
   const selectCategory = (categoryName: string, index: number) => {

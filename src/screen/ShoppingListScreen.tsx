@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   StatusBar,
 } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
+import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
 
 interface ShoppingItem {
   id: string;
@@ -24,14 +26,23 @@ interface ShoppingListScreenProps {
 }
 
 const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _navigation }) => {
-  const [items, setItems] = useState<ShoppingItem[]>([
-    { id: '1', name: 'Pommes', completed: false },
-    { id: '2', name: 'Pain', completed: false },
-    { id: '3', name: 'Œufs', completed: true },
-  ]);
+  const [items, setItems] = useState<ShoppingItem[]>([]);
   const [newItem, setNewItem] = useState('');
 
-  const addItem = () => {
+  useEffect(() => {
+    const uid = auth().currentUser?.uid;
+    if (!uid) return;
+    const unsubscribe = firestore()
+      .collection('users')
+      .doc(uid)
+      .collection('shoppingList')
+      .onSnapshot(snapshot => {
+        setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShoppingItem)));
+      });
+    return unsubscribe;
+  }, []);
+
+  const addItem = async () => {
     const trimmed = newItem.trim();
     if (!trimmed) {
       return;
@@ -43,36 +54,37 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
       return;
     }
 
-    const item: ShoppingItem = {
-      id: Date.now().toString(),
-      name: trimmed,
-      completed: false,
-    };
-
-    setItems([...items, item]);
+    const uid = auth().currentUser?.uid;
+    if (!uid) return;
+    await firestore()
+      .collection('users')
+      .doc(uid)
+      .collection('shoppingList')
+      .add({ name: newItem.trim(), completed: false });
     setNewItem('');
     Keyboard.dismiss();
   };
 
-  const toggleItem = (id: string) => {
-    setItems(items.map(item =>
-      item.id === id ? { ...item, completed: !item.completed } : item
-    ));
+  const toggleItem = async (id: string, completed: boolean) => {
+    const uid = auth().currentUser?.uid;
+    if (!uid) return;
+    await firestore()
+      .collection('users')
+      .doc(uid)
+      .collection('shoppingList')
+      .doc(id)
+      .update({ completed: !completed });
   };
 
-  const removeItem = (id: string) => {
-    Alert.alert(
-      'Supprimer l\'article',
-      'Êtes-vous sûr de vouloir supprimer cet article ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: () => setItems(items.filter(item => item.id !== id)),
-        },
-      ]
-    );
+  const removeItem = async (id: string) => {
+    const uid = auth().currentUser?.uid;
+    if (!uid) return;
+    await firestore()
+      .collection('users')
+      .doc(uid)
+      .collection('shoppingList')
+      .doc(id)
+      .delete();
   };
 
   const completedCount = items.filter(item => item.completed).length;
@@ -81,7 +93,7 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
   const renderItem = ({ item }: { item: ShoppingItem }) => (
     <TouchableOpacity
       style={[styles.itemRow, item.completed && styles.itemRowCompleted]}
-      onPress={() => toggleItem(item.id)}
+      onPress={() => toggleItem(item.id, item.completed ?? false)}
       activeOpacity={0.7}
     >
       <View style={styles.itemContent}>

@@ -313,7 +313,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         navigation.navigate('ProfileUser');
         break;
       case 'recipes':
-        navigation.navigate('Recipes');
+        navigation.navigate('RecipeList');
         break;
       default:
         Alert.alert('Navigation', `Aller vers ${action}`);

@@ -14,6 +14,7 @@ import SplashScreen from '../screen/SplashScreen';
 import ProfileScreen from '../screen/ProfileScreen';
 import OnboardingScreen from '../screen/OnboardingScreen';
 import FamilySetup from '../screen/FamilySetup';
+import RecipeListScreen from '../screen/RecipeListScreen';
 
 
 export type RootStackParamList = {
@@ -28,6 +29,7 @@ export type RootStackParamList = {
   Onboarding: undefined;
   ProfileUser: undefined;
   FamilySetup: undefined;
+  RecipeList: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -47,6 +49,7 @@ const Navigation = () => {
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="ProfileUser" component={ProfileScreen} />
         <Stack.Screen name="FamilySetup" component={FamilySetup} />
+        <Stack.Screen name="RecipeList" component={RecipeListScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

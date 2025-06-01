@@ -6,10 +6,10 @@ import {
   SafeAreaView,
   TextInput,
   TouchableOpacity,
-  FlatList,
   Keyboard,
   Alert,
   StatusBar,
+  ScrollView,
 } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
 import firestore from '@react-native-firebase/firestore';
@@ -19,6 +19,7 @@ interface ShoppingItem {
   id: string;
   name: string;
   completed?: boolean;
+  fromRecipe?: string;
 }
 
 interface ShoppingListScreenProps {
@@ -87,32 +88,17 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
       .delete();
   };
 
+  // Regroupe les items par plat (fromRecipe)
+  const groupedItems = items.reduce((acc, item) => {
+    const key = item.fromRecipe || 'Autres';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {} as { [plat: string]: ShoppingItem[] });
+
   const completedCount = items.filter(item => item.completed).length;
   const totalCount = items.length;
 
-  const renderItem = ({ item }: { item: ShoppingItem }) => (
-    <TouchableOpacity
-      style={[styles.itemRow, item.completed && styles.itemRowCompleted]}
-      onPress={() => toggleItem(item.id, item.completed ?? false)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.itemContent}>
-        <View style={[styles.checkbox, item.completed && styles.checkboxCompleted]}>
-          {item.completed && <Text style={styles.checkmark}>✓</Text>}
-        </View>
-        <Text style={[styles.itemText, item.completed && styles.itemTextCompleted]}>
-          {item.name}
-        </Text>
-      </View>
-      <TouchableOpacity
-        onPress={() => removeItem(item.id)}
-        style={styles.deleteButton}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Text style={styles.deleteButtonText}>🗑️</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -149,20 +135,46 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
 
       {/* Liste des articles */}
       <View style={styles.listSection}>
-        {items.length === 0 ? (
+        {Object.keys(groupedItems).length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateIcon}>📝</Text>
             <Text style={styles.emptyStateText}>Votre liste est vide</Text>
             <Text style={styles.emptyStateSubtext}>Ajoutez votre premier article ci-dessus</Text>
           </View>
         ) : (
-          <FlatList
-            data={items}
-            keyExtractor={item => item.id}
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
+          <ScrollView>
+            {Object.entries(groupedItems).map(([plat, platItems]) => (
+              <View key={plat} style={{ marginBottom: 18 }}>
+                <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 6, color: '#4a90e2' }}>
+                  {plat}
+                </Text>
+                {platItems.map(item => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.itemRow, item.completed && styles.itemRowCompleted]}
+                    onPress={() => toggleItem(item.id, item.completed ?? false)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.itemContent}>
+                      <View style={[styles.checkbox, item.completed && styles.checkboxCompleted]}>
+                        {item.completed && <Text style={styles.checkmark}>✓</Text>}
+                      </View>
+                      <Text style={[styles.itemText, item.completed && styles.itemTextCompleted]}>
+                        {item.name}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => removeItem(item.id)}
+                      style={styles.deleteButton}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Text style={styles.deleteButtonText}>🗑️</Text>
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+          </ScrollView>
         )}
       </View>
     </SafeAreaView>

@@ -106,17 +106,7 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
         <ActivityIndicator size="large" color="#2d7d5e" style={styles.loader} />
       )}
     </View>
-    // Si vous souhaitez un dégradé très subtil ou une couleur de fond légèrement différente, vous pouvez remplacer
-    // <View> par <LinearGradient> ici, comme dans la version précédente.
-    // Par exemple:
-    // <LinearGradient
-    //   colors={['#f8f2e7', '#eef0f4']} // Un dégradé très doux de blanc vers un gris très clair
-    //   start={{ x: 0, y: 0 }}
-    //   end={{ x: 1, y: 1 }}
-    //   style={styles.container}
-    // >
-    //   ... tout le contenu à l'intérieur
-    // </LinearGradient>
+
   );
 };
 
@@ -131,14 +121,14 @@ const styles = StyleSheet.create({
     width: 180, // Agrandir un peu le logo pour plus d'impact
     height: 180,
     marginBottom: 20, // Plus d'espace entre le logo et le titre
-    tintColor: '#ffd700', // Garder la couleur de votre logo si elle n'est pas déjà grise.
-    // Si votre logo est déjà gris comme sur l'image, vous pouvez retirer tintColor
+    tintColor: '#ffd700',
+
   },
   title: {
     fontSize: 48, // Taille comme sur votre image, ou légèrement plus grande
     fontWeight: 'bold',
     color: '#ffd700', // La couleur verte/sombre de votre texte actuel
-    letterSpacing: 2, // Espacement léger pour la lisibilité
+    letterSpacing: 2,
     textAlign: 'center',
     textTransform: 'uppercase',
     marginBottom: 8, // Espace entre le titre et le slogan
@@ -162,7 +152,7 @@ const styles = StyleSheet.create({
   },
   loader: {
     position: 'absolute', // Positionne l'indicateur de chargement
-    bottom: 100, // Au-dessus du texte "Powered by"
+    bottom: 100,
   },
 });
 

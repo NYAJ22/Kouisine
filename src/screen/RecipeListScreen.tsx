@@ -240,6 +240,45 @@ const RecipeListScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           )}
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#ffd700',
+              borderRadius: 10,
+              paddingVertical: 7,
+              paddingHorizontal: 15,
+              alignSelf: 'flex-start',
+              marginTop: 8,
+              marginBottom: 4,
+            }}
+            onPress={async () => {
+              if (!currentUser) {
+                Alert.alert('Erreur', 'Vous devez être connecté pour ajouter à la liste de courses.');
+                return;
+              }
+              try {
+                const uid = currentUser.uid;
+                const shoppingListRef = firestore()
+                  .collection('users')
+                  .doc(uid)
+                  .collection('shoppingList');
+                // Ajoute chaque ingrédient avec le nom du plat
+                await Promise.all(
+                  item.ingredients.map(async (ingredient) => {
+                    await shoppingListRef.add({
+                      name: ingredient,
+                      completed: false,
+                      fromRecipe: item.name, // Pour le regroupement
+                    });
+                  })
+                );
+                Alert.alert('Succès', 'Ingrédients ajoutés à la liste de courses !');
+              } catch (e) {
+                Alert.alert('Erreur', "Impossible d'ajouter à la liste de courses.");
+              }
+            }}
+          >
+            <Text style={{ color: '#333', fontWeight: 'bold' }}>Ajouter à la liste de courses</Text>
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );

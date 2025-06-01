@@ -155,7 +155,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (userDocSnapshot.exists()) {
         const userData = userDocSnapshot.data();
         setUserProfile({
-          name: userData?.name || userData?.displayName || 'Utilisateur',
+          name: userData?.name || userData?.userName || userData?.displayName || 'Utilisateur',
           email: userData?.email || auth().currentUser?.email || '',
           avatar: userData?.avatar,
         });

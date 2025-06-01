@@ -183,10 +183,23 @@ const FamilySetup: React.FC<Props> = ({ navigation }) => {
     }
 
     try {
+      // Met à jour le nom d'utilisateur
       await firestore().collection('users').doc(uid).update({
         userName: userName,
-        familyMembers: members,
       });
+
+      // Ajoute chaque membre dans la sous-collection familyMembers
+      const batch = firestore().batch();
+      const familyMembersRef = firestore().collection('users').doc(uid).collection('familyMembers');
+      // Supprime d'abord les anciens membres (optionnel mais recommandé)
+      const existing = await familyMembersRef.get();
+      existing.forEach(doc => batch.delete(doc.ref));
+      // Ajoute les nouveaux membres
+      members.forEach(member => {
+        const docRef = familyMembersRef.doc(member.id);
+        batch.set(docRef, member);
+      });
+      await batch.commit();
 
       setTimeout(() => {
         setIsLoading(false);

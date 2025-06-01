@@ -106,16 +106,11 @@ const BudgetScreen = () => {
       .collection('budget')
       .add({ category, amount: parsedAmount, note, date: new Date().toLocaleDateString('fr-FR') });
 
-    setExpenses((prev) => [
-      { id: Date.now().toString(), category, amount: parsedAmount, note, date: new Date().toLocaleDateString('fr-FR') },
-      ...prev,
-    ]);
     setCategory('');
     setAmount('');
     setNote('');
     setSelectedCategoryIndex(null);
 
-    // Animation de succès
     Alert.alert('✅ Succès', 'Dépense ajoutée avec succès !');
   };
 

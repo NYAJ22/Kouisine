@@ -500,7 +500,7 @@ const FamilySetup: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2E7D32" />
+      <StatusBar barStyle="light-content" backgroundColor="#ebc665" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 24,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#ebc665',
   },
   headerContent: {
     alignItems: 'center',
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#ffd700',
     borderRadius: 2,
   },
   stepContainer: {
@@ -694,7 +694,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   inputWrapperFocused: {
-    borderColor: '#2E7D32',
+    borderColor: '#ebc665',
     backgroundColor: '#F1F8E9',
   },
   inputIcon: {
@@ -727,7 +727,7 @@ const styles = StyleSheet.create({
   },
   genderButtonSelected: {
     backgroundColor: '#E8F5E8',
-    borderColor: '#2E7D32',
+    borderColor: '#ebc665',
   },
   genderEmoji: {
     fontSize: 24,
@@ -739,10 +739,10 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   genderTextSelected: {
-    color: '#2E7D32',
+    color: '#ebc665',
   },
   addButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#ebc665',
     borderRadius: 16,
     paddingVertical: 18,
     flexDirection: 'row',
@@ -864,20 +864,20 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   continueButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#ebc665',
     borderRadius: 16,
     paddingVertical: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 6,
-    shadowColor: '#4CAF50',
+    shadowColor: '#ebc665',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
   },
   finalContinueButton: {
-    backgroundColor: 'black',
+    backgroundColor: '#ebc665',
     borderRadius: 16,
     paddingVertical: 18,
     flexDirection: 'row',
@@ -918,7 +918,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#2E7D32',
+    color: '#ebc665',
   },
 });
 

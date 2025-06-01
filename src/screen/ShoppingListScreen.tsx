@@ -116,7 +116,7 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1A5D4A" />
+      <StatusBar barStyle="light-content" backgroundColor="#ebc665" />
       {/* Header avec gradient effect */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>🛒 Ma Liste de Courses</Text>
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f7fa',
   },
   header: {
-    backgroundColor: '#1A5D4A',
+    backgroundColor: '#ebc665',
     paddingHorizontal: 20,
     paddingVertical: 25,
     borderBottomLeftRadius: 20,
@@ -225,14 +225,14 @@ const styles = StyleSheet.create({
     borderColor: '#e9ecef',
   },
   addButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#ffd700',
     marginLeft: 12,
     width: 44,
     height: 44,
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#28a745',
+    shadowColor: '#e4af29',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   },
   itemRowCompleted: {
     backgroundColor: '#f8f9fa',
-    borderLeftColor: '#28a745',
+    borderLeftColor: '#ffd700',
     opacity: 0.8,
   },
   itemContent: {
@@ -288,8 +288,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   checkboxCompleted: {
-    backgroundColor: '#28a745',
-    borderColor: '#28a745',
+    backgroundColor: '#e4af29',
+    borderColor: '#e4af29',
   },
   checkmark: {
     color: 'white',

@@ -404,10 +404,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1A5D4A" />
+      <StatusBar barStyle="light-content" backgroundColor="#ebc665" />
 
       <LinearGradient
-        colors={['#1A5D4A', '#2D7A63', '#1A5D4A']}
+        colors={['#e4af29', '#ebc665', '#ffd700']}
         style={styles.headerGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}

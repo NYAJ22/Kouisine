@@ -131,13 +131,13 @@ const styles = StyleSheet.create({
     width: 180, // Agrandir un peu le logo pour plus d'impact
     height: 180,
     marginBottom: 20, // Plus d'espace entre le logo et le titre
-    tintColor: '#2d7d5e', // Garder la couleur de votre logo si elle n'est pas déjà grise.
+    tintColor: '#ffd700', // Garder la couleur de votre logo si elle n'est pas déjà grise.
     // Si votre logo est déjà gris comme sur l'image, vous pouvez retirer tintColor
   },
   title: {
     fontSize: 48, // Taille comme sur votre image, ou légèrement plus grande
     fontWeight: 'bold',
-    color: '#2d7d5e', // La couleur verte/sombre de votre texte actuel
+    color: '#ffd700', // La couleur verte/sombre de votre texte actuel
     letterSpacing: 2, // Espacement léger pour la lisibilité
     textAlign: 'center',
     textTransform: 'uppercase',
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   },
   geminiText: {
     fontWeight: 'bold',
-    color: '#2d7d5e', // Mettre en évidence GeminiAI avec votre couleur principale
+    color: '#ffd700', // Mettre en évidence GeminiAI avec votre couleur principale
   },
   loader: {
     position: 'absolute', // Positionne l'indicateur de chargement

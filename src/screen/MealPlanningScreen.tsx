@@ -297,7 +297,7 @@ const MealPlanningScreen: React.FC = () => {
   if (isLoading && Object.keys(planning).length === 0) { // Afficher le loader seulement au premier chargement
     return (
         <SafeAreaView style={[styles.container, styles.loadingContainer]}>
-            <ActivityIndicator size="large" color="#0D4F3C" />
+            <ActivityIndicator size="large" color="#ebc665" />
             <Text style={styles.loadingText}>Chargement du planning...</Text>
         </SafeAreaView>
     );
@@ -306,7 +306,7 @@ const MealPlanningScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D4F3C" />
+      <StatusBar barStyle="light-content" backgroundColor="#ebc665" />
 
       <Animated.View
         style={[
@@ -394,7 +394,7 @@ const MealPlanningScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {isLoading && <ActivityIndicator style={{marginVertical: 20}} size="small" color="#0D4F3C" />}
+          {isLoading && <ActivityIndicator style={{marginVertical: 20}} size="small" color="#ebc665" />}
 
           {!isLoading && daysOfWeek.map((day, dayIndex) => {
             const dayMeals = planning[day.name] || { breakfast: '', lunch: '', dinner: '' };
@@ -611,10 +611,10 @@ const styles = StyleSheet.create({
   loadingText: { // Ajouté
     marginTop: 10,
     fontSize: 16,
-    color: '#0D4F3C',
+    color: '#ebc665',
   },
   headerGradient: {
-    backgroundColor: '#0D4F3C', // Vert foncé pour le header
+    backgroundColor: '#ebc665', // Vert foncé pour le header
     paddingBottom: 24,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,

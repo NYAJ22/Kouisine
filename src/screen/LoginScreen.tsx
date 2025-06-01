@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
-    color: '#000',
+    color: '#ebc665',
   },
   subtitle: {
     fontSize: 16,
@@ -109,14 +109,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   loginButton: {
-    backgroundColor: '#b4a26a',
+    backgroundColor: '#ebc665',
     padding: 12,
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 10,
   },
   loginText: {
-    color: '#fff',
+    color: '#000',
     fontWeight: 'bold',
   },
   forgot: {
@@ -125,15 +125,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   registerButton: {
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#b4a26a',
+    borderColor: '#ebc665',
     padding: 12,
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 30,
   },
   registerText: {
-    color: '#b4a26a',
+    color: '#000',
     fontWeight: 'bold',
   },
   connectText: {

@@ -21,6 +21,7 @@ interface ShoppingItem {
   name: string;
   completed?: boolean;
   fromRecipe?: string; // Renommé pour être plus générique (catégorie/titre)
+  price?: number; // --- NOUVEAU: Ajout du champ price ---
 }
 
 interface ShoppingListScreenProps {
@@ -30,8 +31,9 @@ interface ShoppingListScreenProps {
 const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _navigation }) => {
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [newItem, setNewItem] = useState('');
-  // Nouveau state pour le titre/catégorie de l'article manuel
   const [newItemTitle, setNewItemTitle] = useState('');
+  // --- NOUVEAU: State pour le prix de l'article manuel ---
+  const [newItemPrice, setNewItemPrice] = useState('');
 
   useEffect(() => {
     const uid = auth().currentUser?.uid;
@@ -48,7 +50,8 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
 
   const addItem = async () => {
     const trimmedItem = newItem.trim();
-    const trimmedTitle = newItemTitle.trim(); // Trim le titre aussi
+    const trimmedTitle = newItemTitle.trim();
+    const parsedPrice = parseFloat(newItemPrice.trim()); // Parse le prix
 
     if (!trimmedItem) {
       Alert.alert('Attention', 'Veuillez saisir un article.');
@@ -67,7 +70,6 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
       return;
     }
 
-    // Ajoute le champ 'fromRecipe' (qui servira de titre/catégorie)
     await firestore()
       .collection('users')
       .doc(uid)
@@ -76,11 +78,13 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
         name: trimmedItem,
         completed: false,
         createdAt: firestore.FieldValue.serverTimestamp(),
-        fromRecipe: trimmedTitle || null, // Utilise trimmedTitle ou null si vide pour 'Autres articles'
+        fromRecipe: trimmedTitle || null,
+        price: isNaN(parsedPrice) ? null : parsedPrice, // --- Enregistre le prix ou null si non valide ---
       });
 
     setNewItem('');
-    setNewItemTitle(''); // Réinitialise le titre après l'ajout
+    setNewItemTitle('');
+    setNewItemPrice(''); // --- Réinitialise le prix ---
     Keyboard.dismiss();
   };
 
@@ -128,24 +132,31 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
     );
   };
 
-  // Regroupe les items par plat (fromRecipe) et trie les plats
   const groupedItems = items.reduce((acc, item) => {
-    const key = item.fromRecipe || 'Autres articles'; // Renommer 'Autres' pour plus de clarté
+    const key = item.fromRecipe || 'Autres articles';
     if (!acc[key]) acc[key] = [];
     acc[key].push(item);
     return acc;
   }, {} as { [plat: string]: ShoppingItem[] });
 
-  // Trie les groupes (ex: "Autres articles" en dernier)
   const sortedGroupKeys = Object.keys(groupedItems).sort((a, b) => {
     if (a === 'Autres articles') return 1;
     if (b === 'Autres articles') return -1;
     return a.localeCompare(b);
   });
 
-
   const completedCount = items.filter(item => item.completed).length;
   const totalCount = items.length;
+
+  // --- NOUVEAU: Calcul du coût total ---
+  const totalCost = items.reduce((sum, item) => {
+    return sum + (item.price && !item.completed ? item.price : 0); // N'inclut que les articles non complétés avec un prix
+  }, 0);
+
+  // --- NOUVEAU: Calcul du coût total de tous les articles (complétés ou non)
+  const grandTotalCost = items.reduce((sum, item) => {
+    return sum + (item.price || 0);
+  }, 0);
 
 
   return (
@@ -156,6 +167,12 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
         <Text style={styles.headerSubtitle}>
           {completedCount} / {totalCount} articles complétés
         </Text>
+        {/* --- NOUVEAU: Affichage du coût total --- */}
+        {grandTotalCost > 0 && (
+          <Text style={styles.totalCostText}>
+            Coût estimé: {grandTotalCost.toFixed(0)} FCFA ({totalCost.toFixed(0)} restant)
+          </Text>
+        )}
       </View>
 
       {/* Section d'ajout modifiée */}
@@ -167,8 +184,7 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
             onChangeText={setNewItem}
             placeholder="Nom de l'article (ex: Lait)..."
             placeholderTextColor="#888"
-            returnKeyType="next" // Change pour passer au champ titre
-            onSubmitEditing={() => { /* Optionnel: focus sur le champ titre si nécessaire */ }}
+            returnKeyType="next"
           />
         </View>
         <View style={styles.inputContainer}>
@@ -176,208 +192,207 @@ const ShoppingListScreen: React.FC<ShoppingListScreenProps> = ({ navigation: _na
             style={styles.input}
             value={newItemTitle}
             onChangeText={setNewItemTitle}
-            placeholder="Titre/Catégorie (ex: Petit Déjeuner, Dîner, Maison)..."
+            placeholder="Titre/Catégorie (ex: Dîner de Noël - optionnel)..."
             placeholderTextColor="#888"
+            returnKeyType="next"
+          />
+        </View>
+        {/* --- NOUVEAU CHAMP POUR LE PRIX MANUEL --- */}
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            value={newItemPrice}
+            onChangeText={setNewItemPrice}
+            placeholder="Prix unitaire (optionnel)..."
+            placeholderTextColor="#888"
+            keyboardType="numeric"
             returnKeyType="done"
             onSubmitEditing={addItem}
           />
-          <TouchableOpacity
-            onPress={addItem}
-            style={styles.addButton}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.addButtonText}>+</Text>
-          </TouchableOpacity>
         </View>
+
+        <TouchableOpacity style={styles.addButton} onPress={addItem}>
+          <Text style={styles.addButtonText}>Ajouter</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Liste des articles */}
-      <View style={styles.listSection}>
-        {totalCount === 0 ? (
+      <ScrollView contentContainerStyle={styles.listContent}>
+        {sortedGroupKeys.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateIcon}>📝</Text>
-            <Text style={styles.emptyStateText}>Votre liste est vide</Text>
-            <Text style={styles.emptyStateSubtext}>Ajoutez votre premier article ci-dessus pour commencer vos achats !</Text>
+            <Text style={styles.emptyStateText}>Votre liste de courses est vide !</Text>
+            <Text style={styles.emptyStateSubtext}>
+              Ajoutez des articles manuellement ou depuis une recette.
+            </Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.listContent}>
-            {sortedGroupKeys.map(plat => (
-              <View key={plat} style={styles.groupContainer}>
-                <Text style={styles.groupTitle}>
-                  {plat}
-                </Text>
-                {groupedItems[plat].map(item => (
+          sortedGroupKeys.map(groupKey => (
+            <View key={groupKey} style={styles.groupContainer}>
+              <Text style={styles.groupTitle}>{groupKey}</Text>
+              {groupedItems[groupKey].map(item => (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.itemContainer,
+                    item.completed && styles.itemContainerCompleted,
+                  ]}
+                >
                   <TouchableOpacity
-                    key={item.id}
-                    style={[styles.itemRow, item.completed && styles.itemRowCompleted]}
-                    onPress={() => toggleItem(item.id, item.completed ?? false)}
-                    activeOpacity={0.7}
+                    style={[styles.checkbox, item.completed && styles.checkboxCompleted]}
+                    onPress={() => toggleItem(item.id, item.completed || false)}
                   >
-                    <View style={styles.itemContent}>
-                      <View style={[styles.checkbox, item.completed && styles.checkboxCompleted]}>
-                        {item.completed && <Text style={styles.checkmark}>✓</Text>}
-                      </View>
-                      <Text style={[styles.itemText, item.completed && styles.itemTextCompleted]} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => removeItem(item.id)}
-                      style={styles.deleteButton}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Text style={styles.deleteButtonText}>✖</Text>
-                    </TouchableOpacity>
+                    {item.completed && <Text style={styles.checkmark}>✔</Text>}
                   </TouchableOpacity>
-                ))}
-              </View>
-            ))}
-          </ScrollView>
+                  <Text
+                    style={[styles.itemText, item.completed && styles.itemTextCompleted]}
+                  >
+                    {item.name}
+                  </Text>
+                  {/* --- NOUVEAU: Affichage du prix de l'article --- */}
+                  {item.price !== undefined && item.price !== null && (
+                    <Text style={[styles.itemPrice, item.completed && styles.itemTextCompleted]}>
+                      {item.price.toFixed(0)} FCFA
+                    </Text>
+                  )}
+                  <TouchableOpacity style={styles.deleteButton} onPress={() => removeItem(item.id)}>
+                    <Text style={styles.deleteButtonText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          ))
         )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
 
+export default ShoppingListScreen;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f4f8',
+    backgroundColor: '#f0f2f5',
   },
   header: {
-    backgroundColor: '#7b1fa2',
+    backgroundColor: '#8e24aa', // Violet
+    paddingVertical: 20,
     paddingHorizontal: 25,
-    paddingVertical: 35,
+    alignItems: 'center',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    shadowColor: '#4a148c',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
     elevation: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginBottom: 20,
   },
   headerTitle: {
-    color: 'white',
     fontSize: 28,
     fontWeight: 'bold',
-    letterSpacing: 0.8,
-    marginBottom: 8,
-    fontFamily: Platform.OS === 'ios' ? 'AvenirNext-Bold' : 'Roboto-Bold',
+    color: '#fff',
+    marginBottom: 5,
+    textShadowColor: 'rgba(0,0,0,0.15)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   headerSubtitle: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 15,
-    fontFamily: Platform.OS === 'ios' ? 'AvenirNext-Medium' : 'Roboto-Medium',
+    fontSize: 16,
+    color: '#e0e0e0',
+    marginBottom: 10,
+  },
+  totalCostText: { // Nouveau style pour le coût total
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 5,
+    textShadowColor: 'rgba(0,0,0,0.1)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   inputSection: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    marginTop: -30,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
-    elevation: 8,
-    zIndex: 1,
-    paddingVertical: 10, // Ajout de padding vertical pour espacer les deux champs
+    paddingHorizontal: 20,
+    marginBottom: 25,
   },
   inputContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 18, // Garde le padding horizontal
-    paddingVertical: 8, // Réduit le padding vertical pour les deux champs
-    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 3,
   },
   input: {
-    flex: 1,
-    backgroundColor: '#eef3f7',
-    paddingHorizontal: 18,
-    paddingVertical: Platform.OS === 'ios' ? 15 : 12,
-    borderRadius: 12,
     fontSize: 17,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
     color: '#333',
-    borderWidth: 1,
-    borderColor: '#dde8f0',
-    fontFamily: Platform.OS === 'ios' ? 'AvenirNext-Regular' : 'Roboto-Regular',
   },
   addButton: {
-    backgroundColor: '#ffc107',
-    marginLeft: 15,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
+    backgroundColor: '#4caf50', // Vert éclatant
+    paddingVertical: 16,
+    borderRadius: 15,
     alignItems: 'center',
-    shadowColor: '#ffc107',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowColor: '#4caf50',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
   },
   addButtonText: {
-    color: 'white',
-    fontSize: 28,
-    fontWeight: '300',
-  },
-  listSection: {
-    flex: 1,
-    paddingHorizontal: 20,
-    marginTop: 20,
+    color: '#fff',
+    fontSize: 19,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   listContent: {
+    paddingHorizontal: 20,
     paddingBottom: 30,
   },
   groupContainer: {
     marginBottom: 25,
-  },
-  groupTitle: {
-    fontWeight: 'bold',
-    fontSize: 18,
-    marginBottom: 12,
-    color: '#4a148c',
-    fontFamily: Platform.OS === 'ios' ? 'AvenirNext-DemiBold' : 'Roboto-Bold',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    paddingBottom: 5,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    paddingVertical: 15,
-    paddingHorizontal: 18,
+    backgroundColor: '#fff',
     borderRadius: 15,
-    marginBottom: 10,
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingVertical: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 4,
-    borderLeftWidth: 5,
-    borderLeftColor: '#8e24aa',
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
   },
-  itemRowCompleted: {
-    backgroundColor: '#eef3f7',
-    borderLeftColor: '#ffc107',
-    opacity: 0.9,
+  groupTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#8e24aa', // Violet
+    marginBottom: 15,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    paddingBottom: 10,
   },
-  itemContent: {
+  itemContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderBottomWidth: 0, // Enlevé le séparateur pour ne pas avoir de double ligne
+    borderBottomColor: '#eee',
+  },
+  itemContainerCompleted: {
+    backgroundColor: '#f8f8f8', // Légère couleur pour les éléments complétés
   },
   checkbox: {
     width: 26,
     height: 26,
     borderRadius: 13,
     borderWidth: 2,
-    borderColor: '#bdbdbd',
-    marginRight: 15,
+    borderColor: '#8e24aa',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 15,
     backgroundColor: 'white',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -405,10 +420,17 @@ const styles = StyleSheet.create({
     color: '#888',
     fontFamily: Platform.OS === 'ios' ? 'AvenirNext-Regular' : 'Roboto-Regular',
   },
+  itemPrice: { // Nouveau style pour le prix de l'article
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '600',
+    marginLeft: 10,
+  },
   deleteButton: {
     padding: 10,
     borderRadius: 10,
     backgroundColor: '#ffebee',
+    marginLeft: 10,
   },
   deleteButtonText: {
     fontSize: 20,
@@ -424,23 +446,19 @@ const styles = StyleSheet.create({
   emptyStateIcon: {
     fontSize: 60,
     marginBottom: 20,
-    opacity: 0.7,
+    opacity: 0.6,
   },
   emptyStateText: {
-    fontSize: 20,
-    color: '#607d8b',
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#666',
     marginBottom: 10,
     textAlign: 'center',
-    fontFamily: Platform.OS === 'ios' ? 'AvenirNext-Bold' : 'Roboto-Bold',
   },
   emptyStateSubtext: {
-    fontSize: 15,
-    color: '#90a4ae',
+    fontSize: 16,
+    color: '#888',
     textAlign: 'center',
-    lineHeight: 22,
-    fontFamily: Platform.OS === 'ios' ? 'AvenirNext-Regular' : 'Roboto-Regular',
+    paddingHorizontal: 30,
   },
 });
-
-export default ShoppingListScreen;

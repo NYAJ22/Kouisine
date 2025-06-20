@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Animated, StatusBar, Platform } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/Navigation';
-// import LinearGradient from 'react-native-linear-gradient'; // Garder si vous voulez un dégradé très subtil ou une couleur différente
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
@@ -67,11 +66,6 @@ const SplashScreen: React.FC<Props> = ({ navigation }) => {
 
     return () => {
       clearTimeout(timeout);
-      // Réinitialiser la barre de statut pour les écrans suivants si nécessaire
-      // StatusBar.setBarStyle('dark-content'); // ou 'light-content' selon l'écran suivant
-      // if (Platform.OS === 'android') {
-      //   StatusBar.setBackgroundColor('#f8f2e7'); // ou la couleur de fond de l'écran suivant
-      // }
     };
   }, [startAnimation, navigateToNextScreen]);
 
@@ -121,13 +115,12 @@ const styles = StyleSheet.create({
     width: 180, // Agrandir un peu le logo pour plus d'impact
     height: 180,
     marginBottom: 20, // Plus d'espace entre le logo et le titre
-    tintColor: '#ffd700',
 
   },
   title: {
     fontSize: 48, // Taille comme sur votre image, ou légèrement plus grande
     fontWeight: 'bold',
-    color: '#ffd700', // La couleur verte/sombre de votre texte actuel
+    color: '#000000',
     letterSpacing: 2,
     textAlign: 'center',
     textTransform: 'uppercase',
@@ -148,7 +141,7 @@ const styles = StyleSheet.create({
   },
   geminiText: {
     fontWeight: 'bold',
-    color: '#ffd700', // Mettre en évidence GeminiAI avec votre couleur principale
+    color: '#000000', // Mettre en évidence GeminiAI avec votre couleur principale
   },
   loader: {
     position: 'absolute', // Positionne l'indicateur de chargement

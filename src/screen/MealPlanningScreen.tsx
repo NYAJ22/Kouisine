@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -72,6 +73,7 @@ const MealPlanningScreen: React.FC = () => {
   const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(true); // État de chargement
+  const [isAILoading, setIsAILoading] = useState(false);
 
   const fadeAnim = useMemo(() => new Animated.Value(0), []);
   const slideAnim = useMemo(() => new Animated.Value(30), []);
@@ -503,11 +505,31 @@ const MealPlanningScreen: React.FC = () => {
 
           {!isLoading && (
             <View style={styles.quickActionsContainer}>
-                <TouchableOpacity style={styles.quickActionButton} activeOpacity={0.8} onPress={() => Alert.alert("Prochainement", "Cette fonctionnalité sera bientôt disponible.")}>
+                <TouchableOpacity style={styles.quickActionButton} activeOpacity={0.8} onPress={async () => {
+                  setIsAILoading(true);
+                  try {
+                    const aiText = await generateWeeklyPlanningAI();
+                    // Extraction du JSON (parfois l'IA entoure de texte, donc on parse intelligemment)
+                    const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+                    const jsonString = jsonMatch ? jsonMatch[0] : aiText;
+                    const aiPlanning = JSON.parse(jsonString);
+                    setPlanning(aiPlanning);
+                    saveCurrentPlanning(aiPlanning);
+                    Alert.alert('Succès', 'Planning généré automatiquement !');
+                  } catch (e) {
+                    Alert.alert('Erreur', "Impossible de générer le planning IA.");
+                    console.error(e);
+                  }
+                  setIsAILoading(false);
+                }}
+                disabled={isAILoading}
+                >
                 <View style={[styles.quickActionIconContainer, { backgroundColor: '#e74c3c20' }]}>
                   <Text style={styles.quickActionIcon}>🎲</Text>
                 </View>
-                <Text style={styles.quickActionText}>Suggestion aléatoire</Text>
+                <Text style={styles.quickActionText}>
+                  {isAILoading ? 'Génération...' : 'Suggestion aléatoire'}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickActionButton} activeOpacity={0.8} onPress={() => Alert.alert("Prochainement", "Cette fonctionnalité sera bientôt disponible.")}>
                 <View style={[styles.quickActionIconContainer, { backgroundColor: '#3498db20' }]}>
@@ -597,6 +619,29 @@ const MealPlanningScreen: React.FC = () => {
       </Modal>
     </SafeAreaView>
   );
+};
+
+// Ajoute ta clé API Gemini ici (à sécuriser en prod)
+const API_KEY = 'AIzaSyDvLm1P8PPIuYyPZOBo_ssK40NXJMd9rtY';
+
+const generateWeeklyPlanningAI = async () => {
+  const prompt = `
+Génère un planning de repas pour une semaine complète, sous la forme d'un objet JSON.
+Pour chaque jour (Lundi à Dimanche), propose un petit-déjeuner, un déjeuner et un dîner variés, équilibrés et adaptés à une famille.
+Format de réponse strictement :
+{
+  "Lundi": { "breakfast": "...", "lunch": "...", "dinner": "..." },
+  "Mardi": { ... },
+  ...
+  "Dimanche": { ... }
+}
+Ne mets aucun commentaire ni texte autour, uniquement le JSON.
+  `;
+  const genAI = new GoogleGenerativeAI(API_KEY);
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  return response.text();
 };
 
 const styles = StyleSheet.create({

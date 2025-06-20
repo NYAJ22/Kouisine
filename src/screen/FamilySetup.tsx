@@ -43,7 +43,7 @@ const getSmartEmoji = (age: number, gender: Gender): string => {
   } else if (age <= 12) {
     return gender === 'male' ? '👦' : '👧'; // Enfant
   } else if (age <= 17) {
-    return gender === 'male' ? '🧒' : '👧'; // Adolescent
+    return gender === 'male' ? '🧑‍🦱' : '👩‍🦱'; // Adolescent
   } else if (age <= 59) {
     return gender === 'male' ? '👨' : '👩'; // Adulte
   } else {
@@ -143,7 +143,7 @@ const FamilySetup: React.FC<Props> = ({ navigation }) => {
     setAge('');
     setSelectedGender('male');
 
-    // Animation pour le nouveau membre
+    // Animation pour le nouveau membre (optionnel, peut être ajusté)
     Animated.spring(slideAnim, {
       toValue: 0,
       useNativeDriver: true,
@@ -191,7 +191,7 @@ const FamilySetup: React.FC<Props> = ({ navigation }) => {
       // Ajoute chaque membre dans la sous-collection familyMembers
       const batch = firestore().batch();
       const familyMembersRef = firestore().collection('users').doc(uid).collection('familyMembers');
-      // Supprime d'abord les anciens membres (optionnel mais recommandé)
+      // Supprime d'abord les anciens membres (optionnel mais recommandé pour éviter les doublons lors des re-runs)
       const existing = await familyMembersRef.get();
       existing.forEach(doc => batch.delete(doc.ref));
       // Ajoute les nouveaux membres
@@ -272,7 +272,7 @@ const FamilySetup: React.FC<Props> = ({ navigation }) => {
       <View style={styles.memberInfo}>
         <View style={[
           styles.memberAvatarContainer,
-          { backgroundColor: item.gender === 'male' ? '#E3F2FD' : '#FCE4EC' }
+          { backgroundColor: item.gender === 'male' ? '#E3F2FD' : '#FCE4EC' } // Couleurs plus douces
         ]}>
           <Text style={styles.memberEmoji}>{item.emoji}</Text>
         </View>
@@ -450,6 +450,7 @@ const FamilySetup: React.FC<Props> = ({ navigation }) => {
               renderItem={renderMemberItem}
               showsVerticalScrollIndicator={false}
               scrollEnabled={false}
+              contentContainerStyle={styles.memberListContent} // Nouveau style pour la FlatList
             />
           </View>
         )}
@@ -500,7 +501,7 @@ const FamilySetup: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#ebc665" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF6B6B" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -555,79 +556,87 @@ const FamilySetup: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8F8F8', // Arrière-plan général plus doux
   },
   keyboardView: {
     flex: 1,
   },
   header: {
     paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 24,
-    backgroundColor: '#ebc665',
+    paddingTop: 30, // Plus d'espace en haut
+    paddingBottom: 28, // Plus d'espace en bas
+    backgroundColor: '#FF6B6B', // Couleur primaire vibrante
+    borderBottomLeftRadius: 30, // Coins arrondis en bas
+    borderBottomRightRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 12,
   },
   headerContent: {
     alignItems: 'center',
     marginBottom: 20,
   },
   headerEmoji: {
-    fontSize: 48,
+    fontSize: 56, // Emoji plus grand
     marginBottom: 16,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32, // Titre plus grand
     fontWeight: '800',
     color: 'white',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 17, // Texte plus lisible
+    color: 'rgba(255, 255, 255, 0.95)',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 24,
     paddingHorizontal: 20,
   },
   progressContainer: {
     alignItems: 'center',
+    marginTop: 10,
   },
   progressText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.85)',
     marginBottom: 8,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   progressBar: {
-    width: 120,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 2,
+    width: 150, // Barre de progression plus large
+    height: 6, // Plus épaisse
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 3,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#ffd700',
-    borderRadius: 2,
+    backgroundColor: '#FFE66D', // Couleur secondaire
+    borderRadius: 3,
   },
   stepContainer: {
     flex: 1,
   },
-  welcomeContainer: {
+  welcomeContainer: { // Conservé pour référence si jamais utilisé
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 32,
   },
-  welcomeEmoji: {
+  welcomeEmoji: { // Conservé pour référence
     fontSize: 64,
     marginBottom: 20,
   },
-  welcomeTitle: {
+  welcomeTitle: { // Conservé pour référence
     fontSize: 32,
     fontWeight: '800',
     color: 'black',
     textAlign: 'center',
     marginBottom: 12,
   },
-  welcomeSubtitle: {
+  welcomeSubtitle: { // Conservé pour référence
     fontSize: 18,
     color: 'rgba(0, 0, 0, 0.8)',
     textAlign: 'center',
@@ -636,19 +645,20 @@ const styles = StyleSheet.create({
   greetingContainer: {
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingVertical: 25, // Plus de padding
   },
   greetingText: {
-    fontSize: 24,
+    fontSize: 26, // Plus grand
     fontWeight: '700',
-    color: 'black',
+    color: '#333333', // Couleur de texte plus foncée
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   greetingSubtext: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.8)',
+    fontSize: 17,
+    color: '#666666',
     textAlign: 'center',
+    lineHeight: 24,
   },
   content: {
     flex: 1,
@@ -658,54 +668,54 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 24,
     padding: 28,
-    marginHorizontal: 20,
+    marginHorizontal: 10, // Marges latérales réduites pour prendre plus de place
     marginBottom: 24,
-    marginTop: 50,
-    elevation: 8,
+    marginTop: 20, // Moins de marge en haut
+    elevation: 10, // Ombre plus prononcée
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 15,
   },
   formTitle: {
-    fontSize: 22,
+    fontSize: 24, // Titre plus grand
     fontWeight: '700',
-    color: '#333',
-    marginBottom: 24,
+    color: '#333333',
+    marginBottom: 28, // Plus d'espace en bas
     textAlign: 'center',
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 22, // Plus d'espace entre les inputs
   },
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#333333',
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 4,
+    backgroundColor: '#F3F4F6', // Un gris clair plus doux
+    borderRadius: 18, // Coins plus arrondis
+    paddingHorizontal: 18, // Plus de padding horizontal
+    paddingVertical: 2, // Ajustement vertical
     borderWidth: 2,
     borderColor: 'transparent',
   },
   inputWrapperFocused: {
-    borderColor: '#ebc665',
-    backgroundColor: '#F1F8E9',
+    borderColor: '#FF6B6B', // Couleur primaire au focus
+    backgroundColor: '#FFFDE7', // Arrière-plan jaune très clair au focus
   },
   inputIcon: {
-    fontSize: 20,
+    fontSize: 22, // Icône plus grande
     marginRight: 12,
   },
   textInput: {
     flex: 1,
-    fontSize: 16,
-    color: '#333',
-    paddingVertical: 16,
+    fontSize: 17, // Texte plus grand
+    color: '#333333',
+    paddingVertical: 14, // Ajustement du padding vertical
     fontWeight: '500',
   },
   genderContainer: {
@@ -713,77 +723,83 @@ const styles = StyleSheet.create({
   },
   genderButtonsContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 15, // Plus d'espace entre les boutons
   },
   genderButton: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    paddingVertical: 16,
+    backgroundColor: '#F3F4F6', // Arrière-plan doux
+    borderRadius: 18,
+    paddingVertical: 18, // Plus de padding
     paddingHorizontal: 20,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
   },
   genderButtonSelected: {
-    backgroundColor: '#E8F5E8',
-    borderColor: '#ebc665',
+    backgroundColor: '#FFE66D', // Couleur secondaire
+    borderColor: '#FF6B6B', // Bordure avec couleur primaire
   },
   genderEmoji: {
-    fontSize: 24,
+    fontSize: 30, // Emoji plus grand
     marginBottom: 8,
   },
   genderText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    color: '#666',
+    color: '#666666',
   },
   genderTextSelected: {
-    color: '#ebc665',
+    color: '#333333', // Texte plus foncé au focus
   },
   addButton: {
-    backgroundColor: '#ebc665',
-    borderRadius: 16,
+    backgroundColor: '#FF6B6B', // Couleur primaire
+    borderRadius: 18,
     paddingVertical: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#2E7D32',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    elevation: 8, // Ombre plus forte
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    marginTop: 10,
   },
   addButtonIcon: {
-    fontSize: 20,
-    marginRight: 8,
+    fontSize: 22, // Icône plus grande
+    marginRight: 10,
+    color: 'white',
   },
   addButtonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: 'white',
   },
   familyListContainer: {
     marginBottom: 24,
+    marginHorizontal: 10, // Alignement avec les cartes
   },
   familyListTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    color: 'black',
-    marginBottom: 16,
+    color: '#333333',
+    marginBottom: 18,
     textAlign: 'center',
+  },
+  memberListContent: {
+    paddingBottom: 20, // Ajoute un peu de padding en bas de la liste
   },
   memberCard: {
     backgroundColor: 'white',
     borderRadius: 20,
     padding: 20,
-    marginBottom: 12,
+    marginBottom: 15, // Plus d'espace entre les membres
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    elevation: 4,
+    elevation: 6, // Ombre plus douce
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
   },
@@ -793,122 +809,133 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   memberAvatarContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60, // Avatar plus grand
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 18, // Plus d'espace
   },
   memberEmoji: {
-    fontSize: 28,
+    fontSize: 32, // Emoji plus grand
   },
   memberDetails: {
     flex: 1,
   },
   memberName: {
-    fontSize: 18,
+    fontSize: 20, // Nom plus grand
     fontWeight: '700',
-    color: '#333',
-    marginBottom: 4,
+    color: '#333333',
+    marginBottom: 6,
   },
   memberAge: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 15,
+    color: '#666666',
     fontWeight: '500',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   memberGender: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: 13,
+    color: '#999999',
     fontWeight: '500',
   },
   removeButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFEBEE',
+    width: 48, // Bouton plus grand
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFEBEE', // Fond rouge très clair
     justifyContent: 'center',
     alignItems: 'center',
   },
   removeIcon: {
-    fontSize: 18,
+    fontSize: 20,
     color: '#F44336',
     fontWeight: '600',
   },
   emptyStateContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 50, // Plus de padding
     paddingHorizontal: 24,
+    marginHorizontal: 10,
+    backgroundColor: 'white',
+    borderRadius: 24,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
   emptyStateEmoji: {
-    fontSize: 64,
-    marginBottom: 20,
+    fontSize: 70, // Emoji plus grand
+    marginBottom: 25,
   },
   emptyStateTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '700',
-    color: 'black',
+    color: '#333333',
     textAlign: 'center',
     marginBottom: 12,
   },
   emptyStateText: {
-    fontSize: 16,
-    color: 'rgba(0, 0, 0, 0.8)',
+    fontSize: 17,
+    color: '#666666',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 24,
   },
   footerContainer: {
     paddingHorizontal: 24,
     paddingVertical: 20,
-    paddingBottom: 30,
+    paddingBottom: Platform.OS === 'ios' ? 35 : 20, // Ajustement pour iOS bottom safe area
+    backgroundColor: '#F8F8F8', // Correspond au fond pour une transition fluide
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E0E0E0',
   },
   continueButton: {
-    backgroundColor: '#ebc665',
-    borderRadius: 16,
+    backgroundColor: '#FF6B6B', // Couleur primaire
+    borderRadius: 18,
     paddingVertical: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#ebc665',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    elevation: 8,
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.4,
     shadowRadius: 10,
   },
   finalContinueButton: {
-    backgroundColor: '#ebc665',
-    borderRadius: 16,
+    backgroundColor: '#FF6B6B', // Couleur primaire
+    borderRadius: 18,
     paddingVertical: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    elevation: 8,
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.35,
     shadowRadius: 10,
   },
   continueButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6, // Moins d'opacité pour le bouton désactivé
     elevation: 0,
     shadowOpacity: 0,
   },
   continueButtonText: {
-    fontSize: 18,
+    fontSize: 19, // Texte plus grand
     fontWeight: '700',
     color: 'white',
-    marginRight: 8,
+    marginRight: 10,
   },
   continueButtonIcon: {
-    fontSize: 20,
+    fontSize: 22, // Icône plus grande
     color: 'white',
   },
   continueHint: {
-    fontSize: 14,
-    color: 'rgba(0, 0, 0, 0.7)',
+    fontSize: 15,
+    color: '#666666',
     textAlign: 'center',
-    marginTop: 12,
+    marginTop: 15,
     fontStyle: 'italic',
   },
   loadingContainer: {
@@ -916,9 +943,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700',
-    color: '#ebc665',
+    color: 'white', // Texte blanc pour le chargement sur le bouton
   },
 });
 

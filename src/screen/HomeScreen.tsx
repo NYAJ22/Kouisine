@@ -11,12 +11,12 @@ import {
   Animated,
   Dimensions,
   RefreshControl,
-  Platform, // Ajout de l'import Platform
+  Platform,
 } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from 'react-native-linear-gradient'; // Make sure this is installed: npm install react-native-linear-gradient
 
 // Types
 interface UserProfile {
@@ -25,14 +25,13 @@ interface UserProfile {
   avatar?: string;
 }
 
-// Mise à jour de l'interface TodayMeals pour inclure le petit-déjeuner
 interface TodayMeals {
   breakfast: string;
   lunch: string;
   dinner: string;
   lunchRecipeId?: string;
   dinnerRecipeId?: string;
-  breakfastRecipeId?: string; // Au cas où vous stockeriez des ID de recette pour le petit-déjeuner
+  breakfastRecipeId?: string;
 }
 
 interface ExpiringItem {
@@ -63,22 +62,22 @@ function getCurrentWeekId(offset: number = 0): string {
 
   const year = monday.getFullYear();
   // Calcul du numéro de semaine ISO 8601 (simplifié)
+  // Il y a des cas limites, mais pour un usage courant c'est suffisant.
   const firstJan = new Date(year, 0, 1);
   const daysOffset = (monday.getTime() - firstJan.getTime()) / (24 * 60 * 60 * 1000);
   const firstJanDayOfWeek = (firstJan.getDay() === 0) ? 7 : firstJan.getDay(); // Lundi=1, Dimanche=7
-  const weekNumber = Math.ceil((daysOffset + firstJanDayOfWeek -1) / 7);
+  const weekNumber = Math.ceil((daysOffset + firstJanDayOfWeek - 1) / 7);
 
   return `${year}-W${String(weekNumber).padStart(2, '0')}`;
 }
 
 // Noms des jours en français pour correspondre aux clés du planning
-const dayNamesForPlanning = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+const dayNamesForPlanning = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [currentDate, setCurrentDate] = useState<string>('');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  // Mise à jour de l'état initial de todayMeals
   const [todayMeals, setTodayMeals] = useState<TodayMeals>({
     breakfast: 'Aucun repas planifié',
     lunch: 'Aucun repas planifié',
@@ -88,7 +87,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [expiringItems, setExpiringItems] = useState<ExpiringItem[]>([]);
   const [totalStockItems, setTotalStockItems] = useState<number>(0);
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [loadingMeals, setLoadingMeals] = useState<boolean>(true); // État de chargement spécifique aux repas
+  const [loadingMeals, setLoadingMeals] = useState<boolean>(true);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -103,6 +102,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     };
     setCurrentDate(today.toLocaleDateString('fr-FR', options));
 
+    // Animations d'entrée pour les éléments principaux
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -116,40 +116,42 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       }),
     ]).start();
 
+    // Listener pour recharger les données lorsque l'écran est à nouveau focus
     const unsubscribeFocus = navigation.addListener('focus', () => {
-        loadUserData(); // Recharger les données lorsque l'écran revient au premier plan
+        loadUserData();
     });
-    
-    loadUserData(); // Chargement initial
+
+    loadUserData(); // Chargement initial des données
 
     return () => {
-        unsubscribeFocus();
+        unsubscribeFocus(); // Nettoyage du listener de focus
         // Les désabonnements des listeners Firestore sont gérés dans loadUserData
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigation]); // Ajout de navigation aux dépendances pour le listener de focus
+  }, [navigation, fadeAnim, slideAnim]); // Ajout de fadeAnim et slideAnim dans les dépendances
 
   const loadUserData = async () => {
     const uid = auth().currentUser?.uid;
     if (!uid) {
       console.log('User not logged in');
       setLoadingMeals(false);
-      // Réinitialiser les états si l'utilisateur n'est pas connecté
+      setRefreshing(false);
+      // Réinitialiser tous les états si l'utilisateur n'est pas connecté
       setUserProfile(null);
       setTodayMeals({ breakfast: 'Aucun repas planifié', lunch: 'Aucun repas planifié', dinner: 'Aucun repas planifié' });
       setShoppingListCount(0);
       setExpiringItems([]);
       setTotalStockItems(0);
+      // Retourne une fonction vide pour le nettoyage si pas d'utilisateur
       return () => {};
     }
 
-    setRefreshing(true); // Indique le début du chargement/rafraîchissement
-    setLoadingMeals(true);
+    setRefreshing(true); // Indique le début du rafraîchissement global
+    setLoadingMeals(true); // Indique le début du chargement des repas spécifiques
 
-    const cleanupFunctions: (() => void)[] = [];
+    const cleanupFunctions: (() => void)[] = []; // Pour stocker les fonctions de désabonnement
 
     try {
-      // Charger le profil utilisateur
+      // 1. Charger le profil utilisateur
       const userDocRef = firestore().collection('users').doc(uid);
       const userDocSnapshot = await userDocRef.get();
       if (userDocSnapshot.exists()) {
@@ -163,18 +165,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setUserProfile(null);
       }
 
-      // Listener pour la liste de courses
+      // 2. Listener pour la liste de courses
       const unsubscribeShopping = firestore()
         .collection('users')
         .doc(uid)
         .collection('shoppingList')
-        .where('purchased', '==', false)
+        .where('completed', '==', false) // Filtrer les articles non achetés
         .onSnapshot(snapshot => {
           setShoppingListCount(snapshot.size);
-        }, error => console.error("Error fetching shopping list:", error));
+        }, error => console.error('Error fetching shopping list:', error));
       cleanupFunctions.push(unsubscribeShopping);
 
-      // Listener pour le frigo/stock
+      // 3. Listener pour le frigo/stock et les articles expirants
       const unsubscribeFridge = firestore()
         .collection('users')
         .doc(uid)
@@ -182,18 +184,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         .onSnapshot(snapshot => {
           setTotalStockItems(snapshot.size);
           const now = new Date();
+          now.setHours(0, 0, 0, 0); // Normaliser la date actuelle au début du jour
+
           const expiring: ExpiringItem[] = [];
           snapshot.forEach(doc => {
             const data = doc.data();
             if (data.expiryDate) {
               let expiryDate: Date;
-              if (data.expiryDate.toDate) {
+              if (data.expiryDate.toDate) { // Firebase Timestamp
                 expiryDate = data.expiryDate.toDate();
-              } else if (typeof data.expiryDate === 'string') {
+              } else if (typeof data.expiryDate === 'string') { // Chaîne de date (ex: "DD/MM/YYYY")
                 const parts = data.expiryDate.split('/');
                 if (parts.length === 3) {
-                    const [day, month, year] = parts;
-                    expiryDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                    // Les mois sont basés sur 0 dans Date (Janvier = 0)
+                    expiryDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
                 } else {
                     console.warn(`Invalid date string format: ${data.expiryDate} for item ${doc.id}`);
                     return;
@@ -202,28 +206,34 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 console.warn(`Unrecognized expiryDate format for item ${doc.id}:`, data.expiryDate);
                 return;
               }
+              // Assurez-vous que la date parsée est valide
               if (isNaN(expiryDate.getTime())) {
                 console.warn(`Parsed expiryDate is invalid for item ${doc.id}:`, data.expiryDate);
                 return;
               }
-              const days = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-              if (days <= 3) {
+
+              expiryDate.setHours(0, 0, 0, 0); // Normaliser la date d'expiration au début du jour
+
+              const timeDiff = expiryDate.getTime() - now.getTime();
+              const days = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)); // Arrondi au supérieur pour inclure le jour même
+
+              if (days <= 3) { // 0 jour (aujourd'hui), 1 jour (demain), 2 jours, 3 jours
                 expiring.push({
                   id: doc.id,
                   name: data.name || 'Produit',
-                  days: Math.max(days, 0),
+                  days: Math.max(days, 0), // Assure que les jours ne sont pas négatifs si déjà expiré
                   quantity: data.quantity || 1,
                   category: data.category || 'Autre',
                 });
               }
             }
           });
-          expiring.sort((a, b) => a.days - b.days);
+          expiring.sort((a, b) => a.days - b.days); // Trier par nombre de jours restants
           setExpiringItems(expiring);
-        }, error => console.error("Error fetching fridge items:", error));
+        }, error => console.error('Error fetching fridge items:', error));
       cleanupFunctions.push(unsubscribeFridge);
 
-      // ***** NOUVELLE LOGIQUE POUR CHARGER LES REPAS DU JOUR DEPUIS LE PLANNING HEBDOMADAIRE *****
+      // 4. Listener pour les repas du jour depuis le planning hebdomadaire
       const currentWeekId = getCurrentWeekId(0); // Semaine actuelle
       const today = new Date();
       const todayDayName = dayNamesForPlanning[today.getDay()]; // Nom du jour actuel (ex: "Lundi")
@@ -231,28 +241,26 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       const mealPlanningRef = firestore()
         .collection('users')
         .doc(uid)
-        .collection('mealPlanning') // Collection utilisée par MealPlanningScreen
+        .collection('mealPlanning')
         .doc(currentWeekId);
 
       const unsubscribeWeeklyMeals = mealPlanningRef.onSnapshot(docSnapshot => {
         setLoadingMeals(true); // Indiquer le chargement des repas
         if (docSnapshot.exists()) {
           const weeklyPlanningData = docSnapshot.data();
-          const planningForWeek = weeklyPlanningData?.planning; // L'objet { Lundi: {...}, Mardi: {...} }
+          const planningForWeek = weeklyPlanningData?.planning;
 
           if (planningForWeek && planningForWeek[todayDayName]) {
-            const mealsForToday = planningForWeek[todayDayName]; // { breakfast: "...", lunch: "...", dinner: "..." }
+            const mealsForToday = planningForWeek[todayDayName];
             setTodayMeals({
               breakfast: mealsForToday.breakfast || 'Aucun repas planifié',
               lunch: mealsForToday.lunch || 'Aucun repas planifié',
               dinner: mealsForToday.dinner || 'Aucun repas planifié',
-              // Les RecipeId ne sont pas dans cette structure de données, donc ils seront undefined
-              breakfastRecipeId: undefined,
-              lunchRecipeId: undefined,
-              dinnerRecipeId: undefined,
+              breakfastRecipeId: mealsForToday.breakfastRecipeId,
+              lunchRecipeId: mealsForToday.lunchRecipeId,
+              dinnerRecipeId: mealsForToday.dinnerRecipeId,
             });
           } else {
-            // Pas de planning pour ce jour spécifique
             setTodayMeals({
               breakfast: 'Aucun repas planifié',
               lunch: 'Aucun repas planifié',
@@ -260,7 +268,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             });
           }
         } else {
-          // Pas de document de planning pour cette semaine
           setTodayMeals({
             breakfast: 'Aucun repas planifié',
             lunch: 'Aucun repas planifié',
@@ -270,14 +277,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setLoadingMeals(false); // Fin du chargement des repas
         setRefreshing(false); // Fin du rafraîchissement global
       }, error => {
-        console.error("Error fetching weekly meal plan:", error);
+        console.error('Error fetching weekly meal plan:', error);
         setTodayMeals({ breakfast: 'Aucun repas planifié', lunch: 'Aucun repas planifié', dinner: 'Aucun repas planifié' });
         setLoadingMeals(false);
         setRefreshing(false);
       });
       cleanupFunctions.push(unsubscribeWeeklyMeals);
-      // ***** FIN DE LA NOUVELLE LOGIQUE *****
 
+      // Retourne une fonction de nettoyage qui désabonne tous les listeners Firestore
       return () => {
         cleanupFunctions.forEach(cleanup => cleanup());
       };
@@ -286,13 +293,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       Alert.alert('Erreur', 'Impossible de charger les données utilisateur.');
       setLoadingMeals(false);
       setRefreshing(false);
-      return () => {};
+      return () => {}; // Retourne une fonction vide pour le nettoyage
     }
   };
 
-
   const onRefresh = () => {
-    loadUserData(); // loadUserData gère déjà setRefreshing(true/false)
+    // loadUserData gère déjà setRefreshing(true/false)
+    loadUserData();
   };
 
   const handleQuickAction = (action: QuickActionType): void => {
@@ -321,16 +328,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   const getExpirationColor = (days: number): string => {
-    if (days === 0) { return '#FF4757'; }
-    if (days === 1) { return '#FF6B6B'; }
-    if (days === 2) { return '#FFB347'; }
-    return '#FFA726';
+    if (days === 0) { return '#FF4757'; } // Rouge vif (expire aujourd'hui)
+    if (days === 1) { return '#FF6B6B'; } // Rouge corail (expire demain)
+    if (days === 2) { return '#FFB347'; } // Orange (expire dans 2 jours)
+    return '#FFA726'; // Jaune-orange (expire dans 3 jours ou plus)
   };
 
   const getExpirationText = (days: number): string => {
     if (days === 0) { return "Expire aujourd'hui"; }
     if (days === 1) { return 'Expire demain'; }
-    return `Expire dans ${days} jours`;
+    if (days >= 2) { return `Expire dans ${days} jours`; }
+    return "Expiré"; // Pour les articles déjà expirés (jours < 0)
   };
 
   const getGreeting = (): string => {
@@ -348,12 +356,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     let recipeId: string | undefined;
     if (mealType === 'lunch') recipeId = todayMeals.lunchRecipeId;
     else if (mealType === 'dinner') recipeId = todayMeals.dinnerRecipeId;
-    else if (mealType === 'breakfast') recipeId = todayMeals.breakfastRecipeId; // Au cas où
+    else if (mealType === 'breakfast') recipeId = todayMeals.breakfastRecipeId;
 
     if (recipeId) {
       navigation.navigate('RecipeDetail', { recipeId });
     } else {
-      navigation.navigate('MealPlanning');
+      navigation.navigate('MealPlanning'); // Redirige vers le planning si pas de recette spécifique
     }
   };
 
@@ -365,19 +373,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             return;
         }
     }
+    // Fallback si le parent n'est pas un Drawer ou si openDrawer n'existe pas
     if (typeof (navigation as any).openDrawer === 'function') {
         (navigation as any).openDrawer();
     } else {
         console.warn('navigation.openDrawer is not a function. Is a Drawer Navigator configured?');
-        Alert.alert('Erreur de navigation', 'Impossible d\'ouvrir le menu latéral.');
+        Alert.alert('Erreur de navigation', 'Impossible d\'ouvrir le menu latéral. Veuillez vérifier la configuration du Drawer Navigator.');
     }
   };
-
 
   const renderQuickStats = () => (
     <View style={styles.quickStatsContainer}>
       <View style={styles.quickStatItem}>
-        <View style={[styles.quickStatIcon, { backgroundColor: '#FF6B6B20' }]}>
+        <View style={[styles.quickStatIcon, { backgroundColor: '#FFC10720' }]}>
           <Text style={styles.quickStatEmoji}>🛒</Text>
         </View>
         <Text style={styles.quickStatNumber}>{shoppingListCount}</Text>
@@ -385,7 +393,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       </View>
 
       <View style={styles.quickStatItem}>
-        <View style={[styles.quickStatIcon, { backgroundColor: '#4ECDC420' }]}>
+        <View style={[styles.quickStatIcon, { backgroundColor: '#42A5F520' }]}>
           <Text style={styles.quickStatEmoji}>🥫</Text>
         </View>
         <Text style={styles.quickStatNumber}>{totalStockItems}</Text>
@@ -393,7 +401,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       </View>
 
       <View style={styles.quickStatItem}>
-        <View style={[styles.quickStatIcon, { backgroundColor: '#FFB34720' }]}>
+        <View style={[styles.quickStatIcon, { backgroundColor: '#FF704320' }]}>
           <Text style={styles.quickStatEmoji}>⚠️</Text>
         </View>
         <Text style={styles.quickStatNumber}>{expiringItems.length}</Text>
@@ -404,10 +412,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#ebc665" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF7043" />
 
       <LinearGradient
-        colors={['#e4af29', '#ebc665', '#ffd700']}
+        colors={['#FF8A65', '#FF7043']}
         style={styles.headerGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -437,7 +445,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#1A5D4A"]} tintColor={"#1A5D4A"}/>
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#FF7043']} tintColor={'#FF7043'}/>
         }
       >
         <Animated.View
@@ -459,7 +467,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
 
           {/* Section des repas du jour */}
-          {/* Vous pouvez ajouter un indicateur de chargement ici si loadingMeals est true */}
           <View style={styles.todayMealsSection}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>🍽️ Vos repas d'aujourd'hui</Text>
@@ -471,32 +478,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Affichage du petit-déjeuner (si vous ajoutez une carte pour cela) */}
-            {/*
-            <TouchableOpacity
-                style={styles.mealCard} // Adaptez ou créez un style pour le petit-déjeuner
+            <View style={styles.mealsContainer}>
+              {/* Petit-déjeuner */}
+              <TouchableOpacity
+                style={styles.mealCard}
                 onPress={() => handleMealPress('breakfast')}
                 activeOpacity={0.7}
-            >
+              >
                 <View style={styles.mealCardHeader}>
-                    <View style={styles.mealTimeContainer}>
-                        <Text style={styles.mealEmoji}>🥐</Text> // Icône pour petit-déjeuner
-                        <Text style={styles.mealType}>Petit-déjeuner</Text>
-                    </View>
-                    <Text style={styles.mealTime}>08:00</Text> // Heure indicative
+                  <View style={styles.mealTimeContainer}>
+                    <Text style={styles.mealEmoji}>☕</Text>
+                    <Text style={styles.mealType}>Petit-déjeuner</Text>
+                  </View>
+                  <Text style={styles.mealTime}>08:00</Text>
                 </View>
                 <Text style={styles.mealName} numberOfLines={2}>
-                    {loadingMeals ? "Chargement..." : todayMeals.breakfast}
+                  {loadingMeals ? 'Chargement...' : todayMeals.breakfast}
                 </Text>
                 <View style={styles.mealCardFooter}>
-                    <Text style={styles.mealActionText}>
-                        {todayMeals.breakfastRecipeId ? 'Voir recette' : (todayMeals.breakfast !== 'Aucun repas planifié' && todayMeals.breakfast !== '' ? 'Modifier' : 'Planifier')}
-                    </Text>
+                  <Text style={styles.mealActionText}>
+                    {todayMeals.breakfastRecipeId ? 'Voir recette' : (todayMeals.breakfast !== 'Aucun repas planifié' && todayMeals.breakfast !== '' ? 'Modifier' : 'Planifier')}
+                  </Text>
                 </View>
-            </TouchableOpacity>
-            */}
+              </TouchableOpacity>
 
-            <View style={styles.mealsContainer}>
+              {/* Déjeuner */}
               <TouchableOpacity
                 style={styles.mealCard}
                 onPress={() => handleMealPress('lunch')}
@@ -510,7 +516,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   <Text style={styles.mealTime}>12:00</Text>
                 </View>
                 <Text style={styles.mealName} numberOfLines={2}>
-                  {loadingMeals ? "Chargement..." : todayMeals.lunch}
+                  {loadingMeals ? 'Chargement...' : todayMeals.lunch}
                 </Text>
                 <View style={styles.mealCardFooter}>
                   <Text style={styles.mealActionText}>
@@ -518,7 +524,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   </Text>
                 </View>
               </TouchableOpacity>
-
+            </View>
+            <View style={styles.mealsContainer}>
+              {/* Dîner - placé seul dans une nouvelle ligne pour un meilleur alignement visuel sur 2 colonnes */}
               <TouchableOpacity
                 style={styles.mealCard}
                 onPress={() => handleMealPress('dinner')}
@@ -532,7 +540,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   <Text style={styles.mealTime}>19:00</Text>
                 </View>
                 <Text style={styles.mealName} numberOfLines={2}>
-                  {loadingMeals ? "Chargement..." : todayMeals.dinner}
+                  {loadingMeals ? 'Chargement...' : todayMeals.dinner}
                 </Text>
                 <View style={styles.mealCardFooter}>
                   <Text style={styles.mealActionText}>
@@ -540,6 +548,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   </Text>
                 </View>
               </TouchableOpacity>
+              {/* Ajout d'une vue vide pour maintenir l'alignement sur deux colonnes pour le dîner */}
+              <View style={styles.mealCardPlaceholder} />
             </View>
           </View>
 
@@ -555,10 +565,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
 
-              {expiringItems.slice(0, 4).map((item: ExpiringItem) => (
+              {expiringItems.slice(0, 4).map((item: ExpiringItem, index: number) => (
                 <TouchableOpacity
                   key={item.id}
-                  style={styles.alertItem}
+                  style={[styles.alertItem, index === expiringItems.slice(0, 4).length - 1 && styles.alertItemLast]}
                   onPress={() => handleQuickAction('stock')}
                   activeOpacity={0.7}
                 >
@@ -597,7 +607,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Text style={styles.sectionTitle}>🚀 Actions rapides</Text>
             <View style={styles.quickActionsGrid}>
               <TouchableOpacity
-                style={[styles.quickActionCard, styles.shoppingCard]}
+                style={styles.quickActionCard}
                 onPress={() => handleQuickAction('shopping')}
                 activeOpacity={0.8}
               >
@@ -607,14 +617,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 <Text style={styles.quickActionTitle}>Ma liste</Text>
                 <Text style={styles.quickActionSubtitle}>de courses</Text>
                 {shoppingListCount > 0 && (
-                  <View style={styles.quickActionBadge}>
+                  <View style={[styles.quickActionBadge, { backgroundColor: '#FFC107' }]}> {/* Using secondary accent */}
                     <Text style={styles.quickActionBadgeText}>{shoppingListCount}</Text>
                   </View>
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.quickActionCard, styles.planningCard]}
+                style={styles.quickActionCard}
                 onPress={() => handleQuickAction('planning')}
                 activeOpacity={0.8}
               >
@@ -626,7 +636,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.quickActionCard, styles.stockCard]}
+                style={styles.quickActionCard}
                 onPress={() => handleQuickAction('stock')}
                 activeOpacity={0.8}
               >
@@ -643,7 +653,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.quickActionCard, styles.recipesCard]}
+                style={styles.quickActionCard}
                 onPress={() => handleQuickAction('recipes')}
                 activeOpacity={0.8}
               >
@@ -655,7 +665,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.quickActionCard, styles.statsCard]}
+                style={styles.quickActionCard}
                 onPress={() => handleQuickAction('stats')}
                 activeOpacity={0.8}
               >
@@ -667,7 +677,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.quickActionCard, styles.profileCard]}
+                style={styles.quickActionCard}
                 onPress={() => handleQuickAction('profile')}
                 activeOpacity={0.8}
               >
@@ -682,7 +692,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
           <View style={styles.inspirationSection}>
             <LinearGradient
-              colors={['#667eea', '#764ba2']}
+              colors={['#42A5F5', '#1E88E5']} // Cool blue gradient for contrast
               style={styles.inspirationCard}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -700,30 +710,47 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </TouchableOpacity>
             </LinearGradient>
           </View>
+
+          {/* Boutons d'action au bas de l'écran (full width) */}
+          <View style={styles.bottomActionsContainer}>
+            <TouchableOpacity
+              style={styles.aiAssistantButton}
+              onPress={() => navigation.navigate('CuisineAI')}
+            >
+              <Text style={styles.aiAssistantButtonText}>🤖 Assistant IA</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+                style={styles.nearbyMarketButton}
+                onPress={() => navigation.navigate('NearbyMarkets')}
+            >
+              <Text style={styles.nearbyMarketButtonText}>🗺️ Trouver un marché proche</Text>
+            </TouchableOpacity>
+          </View>
         </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
 };
+  export default HomeScreen;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#FDFDFD', // Off-white, almost white
   },
   headerGradient: {
     paddingBottom: 24,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    elevation: 12,
+    borderBottomLeftRadius: 35, // More rounded
+    borderBottomRightRadius: 35,
+    elevation: 15, // More prominent shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 15,
   },
   header: {
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 16 : 16,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 10 : 50, // Adjusted for safe area and spacing
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -733,51 +760,55 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    width: 52,
-    height: 52,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 26,
+    width: 58, // Larger logo
+    height: 58,
+    backgroundColor: 'rgba(255,255,255,0.25)', // Slightly more opaque
+    borderRadius: 29,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(255,255,255,0.4)', // Stronger border
   },
   logoText: {
-    fontSize: 24,
+    fontSize: 28, // Larger emoji
   },
   appNameAndSubtitleContainer: {
     marginLeft: 16,
   },
   appName: {
     color: 'white',
-    fontSize: 24,
+    fontSize: 26, // Larger and bolder
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
+    textShadowColor: 'rgba(0,0,0,0.1)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   appSubtitle: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 13,
-    fontWeight: '500',
-    marginTop: 2,
+    color: 'rgba(255,255,255,0.95)', // Slightly lighter
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 4,
   },
   profileButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 24,
+    width: 54, // Larger
+    height: 54,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 27,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: 'rgba(255,255,255,0.4)',
   },
   profileIcon: {
-    fontSize: 18,
+    fontSize: 20, // Larger
     color: 'white',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
+    paddingVertical: 10, // Added vertical padding
   },
   animatedContainer: {
     flex: 1,
@@ -786,180 +817,201 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 24,
     padding: 28,
-    marginTop: -16,
+    marginTop: -25, // Pulls it up into the header gradient
     marginBottom: 24,
-    elevation: 8,
+    elevation: 10, // More prominent shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.18,
+    shadowRadius: 15,
+    borderWidth: StyleSheet.hairlineWidth, // Subtle border
+    borderColor: '#E0E0E0',
   },
   dateText: {
-    fontSize: 22,
+    fontSize: 24, // Larger
     fontWeight: '800',
-    color: '#1A5D4A',
+    color: '#FF7043', // Primary accent color
     marginBottom: 8,
     textTransform: 'capitalize',
   },
   welcomeText: {
-    fontSize: 17,
-    color: '#555',
+    fontSize: 18, // Larger and more prominent
+    color: '#212121', // Darker text
     marginBottom: 24,
-    lineHeight: 25,
-    fontWeight: '500',
+    lineHeight: 26,
+    fontWeight: '600',
   },
   quickStatsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingTop: 16,
+    paddingTop: 18, // More padding
     borderTopWidth: 1,
-    borderTopColor: '#F1F3F4',
+    borderTopColor: '#EEEEEE', // Lighter border
   },
   quickStatItem: {
     alignItems: 'center',
     flex: 1,
+    paddingVertical: 8, // Added padding
   },
   quickStatIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52, // Larger icon background
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)', // Subtle border
   },
   quickStatEmoji: {
-    fontSize: 20,
+    fontSize: 22, // Larger emoji
   },
   quickStatNumber: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#1A5D4A',
+    fontSize: 26, // Larger and bolder
+    fontWeight: '900',
+    color: '#212121', // Darker text
     marginBottom: 4,
   },
   quickStatLabel: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 13,
+    color: '#616161', // Mid-tone text
     textAlign: 'center',
     fontWeight: '600',
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 23, // Larger
     fontWeight: '800',
-    color: '#333',
+    color: '#212121',
     marginBottom: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 18, // More spacing
   },
   sectionAction: {
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
+    backgroundColor: '#EEEEEE', // Lighter background
+    paddingHorizontal: 18, // More padding
+    paddingVertical: 9,
+    borderRadius: 20, // More rounded
     borderWidth: 1,
-    borderColor: '#E9ECEF',
+    borderColor: '#E0E0E0',
   },
   sectionActionText: {
-    fontSize: 13,
-    color: '#1A5D4A',
+    fontSize: 14,
+    color: '#FF7043', // Primary accent
     fontWeight: '700',
   },
   todayMealsSection: {
-    marginBottom: 24,
+    marginBottom: 28, // More spacing
   },
   mealsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 16,
+    gap: 16, // Consistent gap
+    marginBottom: 16, // Space between rows of meal cards
   },
   mealCard: {
     flex: 1,
     backgroundColor: 'white',
     borderRadius: 20,
     padding: 20,
-    elevation: 6,
+    elevation: 8, // More pronounced shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E0E0E0',
+  },
+  // Placeholder pour maintenir l'alignement des colonnes si seulement 1 élément dans une ligne
+  mealCardPlaceholder: {
+    flex: 1,
+    backgroundColor: 'transparent', // Rendre invisible
   },
   mealCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 15, // More spacing
   },
   mealTimeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   mealEmoji: {
-    fontSize: 22,
-    marginRight: 8,
+    fontSize: 24, // Larger emoji
+    marginRight: 10,
   },
   mealType: {
-    fontSize: 15,
-    color: '#666',
+    fontSize: 16,
+    color: '#616161', // Mid-tone text
     fontWeight: '700',
   },
   mealTime: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: 13,
+    color: '#9E9E9E', // Lighter grey
     fontWeight: '600',
   },
   mealName: {
-    fontSize: 16,
+    fontSize: 17, // Slightly larger
     fontWeight: '700',
-    color: '#333',
-    marginBottom: 16,
-    lineHeight: 22,
-    minHeight: 44,
+    color: '#212121',
+    marginBottom: 18, // More spacing
+    lineHeight: 24,
+    minHeight: 48, // Ensure consistent height
   },
   mealCardFooter: {
     alignItems: 'flex-start',
   },
   mealActionText: {
-    fontSize: 13,
-    color: '#1A5D4A',
+    fontSize: 14,
+    color: '#FF7043', // Primary accent
     fontWeight: '700',
   },
   alertsContainer: {
     backgroundColor: 'white',
     borderRadius: 20,
     padding: 20,
-    marginBottom: 24,
-    elevation: 6,
+    marginBottom: 28, // More spacing
+    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E0E0E0',
   },
   alertItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8F9FA',
+    paddingVertical: 15, // More padding
+    borderBottomWidth: StyleSheet.hairlineWidth, // Subtle separator
+    borderBottomColor: '#EEEEEE',
+  },
+  alertItemLast: {
+    borderBottomWidth: 0, // No border for the last item
   },
   alertIconContainer: {
-    marginRight: 16,
+    marginRight: 15,
   },
   alertIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40, // Larger icon
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   alertDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 10, // Dot size
+    height: 10,
+    borderRadius: 5,
+    position: 'absolute',
+    top: 5, // Position the dot
+    right: 5,
+    borderWidth: 1.5,
+    borderColor: 'white', // White border around the dot
   },
   alertInfo: {
     flex: 1,
@@ -967,7 +1019,7 @@ const styles = StyleSheet.create({
   alertItemName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#333',
+    color: '#212121',
     marginBottom: 4,
   },
   alertItemExpiry: {
@@ -976,143 +1028,166 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   alertItemCategory: {
-    fontSize: 11,
-    color: '#999',
-    fontWeight: '500',
+    fontSize: 12,
+    color: '#9E9E9E',
   },
   alertAction: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingLeft: 15,
   },
   alertActionText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '700',
+    fontSize: 20,
+    color: '#9E9E9E', // Grey arrow
   },
   quickActionsContainer: {
-    marginBottom: 24,
+    marginBottom: 30,
   },
   quickActionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 16,
+    gap: 15, // Gap between cards
   },
   quickActionCard: {
-    width: (width - 40 - 16) / 2,
+    width: (width - 40 - 15) / 2, // Calculate width for two columns with padding and gap
     backgroundColor: 'white',
     borderRadius: 20,
     padding: 20,
     alignItems: 'center',
-    elevation: 6,
+    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    position: 'relative',
-    minHeight: 120,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E0E0E0',
+    marginBottom: 15, // Space between rows
   },
-  shoppingCard: { borderLeftWidth: 5, borderLeftColor: '#FF6B6B' },
-  planningCard: { borderLeftWidth: 5, borderLeftColor: '#4ECDC4' },
-  stockCard: { borderLeftWidth: 5, borderLeftColor: '#45B7D1' },
-  statsCard: { borderLeftWidth: 5, borderLeftColor: '#96CEB4' },
-  recipesCard: { borderLeftWidth: 5, borderLeftColor: '#A8E6CF' },
-  profileCard: { borderLeftWidth: 5, borderLeftColor: '#FFD93D' },
   quickActionIcon: {
-    width: 60,
+    width: 60, // Larger icon background
     height: 60,
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
-  shoppingIcon: { backgroundColor: '#FF6B6B20' },
-  planningIcon: { backgroundColor: '#4ECDC420' },
-  stockIcon: { backgroundColor: '#45B7D120' },
-  statsIcon: { backgroundColor: '#96CEB420' },
-  recipesIcon: { backgroundColor: '#A8E6CF20' },
-  profileIconContainer: { backgroundColor: '#FFD93D20' },
-  quickActionEmoji: { fontSize: 28 },
+  quickActionEmoji: {
+    fontSize: 28, // Larger emoji
+  },
   quickActionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#333',
+    color: '#212121',
+    marginBottom: 2,
     textAlign: 'center',
-    marginBottom: 4,
   },
   quickActionSubtitle: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 13,
+    color: '#616161',
     textAlign: 'center',
-    fontWeight: '600',
+    lineHeight: 18,
   },
   quickActionBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#FF6B6B',
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    top: 10,
+    right: 10,
+    backgroundColor: '#FFC107', // Gold for general badges
+    borderRadius: 15,
     paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   quickActionBadgeText: {
     color: 'white',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
+  // Specific colors for quick action icons (backgrounds)
+  shoppingIcon: { backgroundColor: '#FFC10720' }, // Gold light
+  planningIcon: { backgroundColor: '#42A5F520' }, // Blue light
+  stockIcon: { backgroundColor: '#FF704320' }, // Orange light
+  recipesIcon: { backgroundColor: '#8BC34A20' }, // Green light
+  statsIcon: { backgroundColor: '#7B1FA220' }, // Purple light
+  profileIconContainer: { backgroundColor: '#607D8B20' }, // Grey blue light
+
   inspirationSection: {
-    marginBottom: 32,
+    marginBottom: 30,
   },
   inspirationCard: {
     borderRadius: 24,
-    padding: 32,
+    padding: 30,
     alignItems: 'center',
-    elevation: 8,
+    elevation: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.2,
+    shadowRadius: 15,
   },
   inspirationIcon: {
-    fontSize: 32,
-    marginBottom: 12,
+    fontSize: 50,
+    marginBottom: 15,
   },
   inspirationTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '800',
     color: 'white',
-    marginBottom: 16,
+    marginBottom: 12,
+    textAlign: 'center',
   },
   inspirationText: {
     fontSize: 16,
     color: 'rgba(255,255,255,0.9)',
-    textAlign: 'center',
     fontStyle: 'italic',
+    textAlign: 'center',
     lineHeight: 24,
-    marginBottom: 24,
-    fontWeight: '500',
+    marginBottom: 25,
   },
   inspirationButton: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 28,
-    borderWidth: 2,
+    backgroundColor: 'rgba(255,255,255,0.25)', // White translucent
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 25,
+    borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.4)',
   },
   inspirationButtonText: {
     color: 'white',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    textAlign: 'center',
+  },
+
+  bottomActionsContainer: {
+    marginBottom: 30,
+    gap: 15, // Space between buttons
+  },
+  aiAssistantButton: {
+    backgroundColor: '#2196F3', // Bright blue
+    paddingVertical: 18,
+    borderRadius: 28,
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#2196F3',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  aiAssistantButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  nearbyMarketButton: {
+    backgroundColor: '#4CAF50', // Green for map/location
+    paddingVertical: 18,
+    borderRadius: 28,
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  nearbyMarketButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });
-
-export default HomeScreen;

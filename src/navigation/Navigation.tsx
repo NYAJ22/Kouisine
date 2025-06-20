@@ -15,6 +15,8 @@ import ProfileScreen from '../screen/ProfileScreen';
 import OnboardingScreen from '../screen/OnboardingScreen';
 import FamilySetup from '../screen/FamilySetup';
 import RecipeListScreen from '../screen/RecipeListScreen';
+import CuisineAI from '../screen/CuisineAI';
+import NearbyMarketsScreen from '../screen/NearbyMarketsScreen';
 
 
 export type RootStackParamList = {
@@ -30,6 +32,8 @@ export type RootStackParamList = {
   ProfileUser: undefined;
   FamilySetup: undefined;
   RecipeList: undefined;
+  CuisineAI: undefined;
+  NearbyMarkets: undefined; // Ajoute cette ligne
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -50,6 +54,8 @@ const Navigation = () => {
         <Stack.Screen name="ProfileUser" component={ProfileScreen} />
         <Stack.Screen name="FamilySetup" component={FamilySetup} />
         <Stack.Screen name="RecipeList" component={RecipeListScreen} />
+        <Stack.Screen name="CuisineAI" component={CuisineAI} />
+        <Stack.Screen name="NearbyMarkets" component={NearbyMarketsScreen} options={{ title: 'Marchés à proximité' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

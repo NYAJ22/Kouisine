@@ -14,7 +14,7 @@ import { RootStackParamList } from '../navigation/Navigation';
 
 // Google Places API key provided by user
 
-const GOOGLE_PLACES_API_KEY = 'AIzaSyANauSi4tzPazAzFT5pynHiTCXIoOOuO54';
+const GOOGLE_PLACES_API_KEY = 'Votre clé API Google Places';
 
 
 

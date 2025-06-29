@@ -15,16 +15,18 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Share,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
+import * as ImagePicker from 'react-native-image-picker';
 
 interface Ingredient {
   name: string;
   price?: number;
-  // Les champs 'quantity' et 'unit' ont été retirés car non utilisés dans les TextInputs actuels
-  // Si vous voulez les réintégrer, il faudra adapter la saisie et le stockage
+  quantity?: string;
+  unit?: string;
 }
 
 interface Recipe {
@@ -35,8 +37,8 @@ interface Recipe {
   steps: string[];
   imageUrl?: string;
   createdAt?: FirebaseFirestoreTypes.FieldValue;
-  createdBy?: string; // UID de l'utilisateur qui a créé la recette
-  authorName?: string; // Nom d'affichage de l'auteur
+  createdBy?: string;
+  authorName?: string;
 }
 
 const RecipeListScreen: React.FC = () => {
@@ -46,8 +48,10 @@ const RecipeListScreen: React.FC = () => {
   const [newRecipe, setNewRecipe] = useState({
     name: '',
     description: '',
-    ingredients: '', // String pour la saisie des noms d'ingrédients
-    ingredientPrices: '', // String pour la saisie des prix
+    ingredients: '',
+    ingredientPrices: '',
+    ingredientQuantities: '',
+    ingredientUnits: '',
     steps: '',
     imageUrl: '',
   });
@@ -55,8 +59,9 @@ const RecipeListScreen: React.FC = () => {
   const [userNames, setUserNames] = useState<{ [uid: string]: string }>({});
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
-  // 'ingredients' n'est plus utilisé pour la saisie dynamique car nous utilisons des TextInputs multi-lignes
-  // const [ingredients, setIngredients] = useState<Ingredient[]>([{ name: '', quantity: '', unit: '', price: undefined }]);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
 
   const currentUser = auth().currentUser;
 
@@ -68,17 +73,14 @@ const RecipeListScreen: React.FC = () => {
         const fetchedRecipes = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
-          // Assurez-vous que ingredients est bien un tableau d'objets Ingredient
           ingredients: (doc.data().ingredients || []).map((ing: any) => {
-            // Si l'ingrédient est une chaîne, convertissez-le en objet { name: string }
-            // Si c'est déjà un objet avec 'name' et 'price', utilisez-le tel quel
             return typeof ing === 'string' ? { name: ing } : ing;
           }),
         } as Recipe));
         setRecipes(fetchedRecipes);
         setLoading(false);
       }, error => {
-        console.error("Erreur de chargement des recettes:", error);
+        console.error('Erreur de chargement des recettes:', error);
         Alert.alert('Erreur', 'Impossible de charger les recettes.');
         setLoading(false);
       });
@@ -116,18 +118,61 @@ const RecipeListScreen: React.FC = () => {
         description: recipeToEdit.description,
         ingredients: recipeToEdit.ingredients.map(i => i.name).join('\n'),
         ingredientPrices: recipeToEdit.ingredients.map(i => i.price !== undefined ? i.price.toString() : '').join('\n'),
+        ingredientQuantities: recipeToEdit.ingredients.map(i => i.quantity || '').join('\n'),
+        ingredientUnits: recipeToEdit.ingredients.map(i => i.unit || '').join('\n'),
         steps: recipeToEdit.steps.join('\n'),
         imageUrl: recipeToEdit.imageUrl || '',
       });
     } else {
       setEditingRecipe(null);
-      setNewRecipe({ name: '', description: '', ingredients: '', ingredientPrices: '', steps: '', imageUrl: '' });
+      setNewRecipe({
+        name: '',
+        description: '',
+        ingredients: '',
+        ingredientPrices: '',
+        ingredientQuantities: '',
+        ingredientUnits: '',
+        steps: '',
+        imageUrl: '',
+      });
     }
     setModalVisible(true);
   };
 
+  const handlePickImage = () => {
+    setImageLoading(true);
+    ImagePicker.launchImageLibrary({
+      mediaType: 'photo',
+      includeBase64: true,
+      maxHeight: 800,
+      maxWidth: 800,
+      quality: 0.7,
+    }, (response) => {
+      setImageLoading(false);
+      if (response.didCancel) {
+        console.log('User cancelled image picker');
+      } else if (response.errorCode) {
+        console.log('ImagePicker Error: ', response.errorMessage);
+        Alert.alert('Erreur', "Impossible de charger l'image");
+      } else if (response.assets && response.assets[0].uri) {
+        const source = `data:image/jpeg;base64,${response.assets[0].base64}`;
+
+        // Vérifier la taille de l'image
+        const base64Length = source.length - (source.indexOf(',') + 1);
+        const sizeInBytes = 4 * Math.ceil(base64Length / 3) * 0.5624896334383812;
+        const sizeInMB = sizeInBytes / (1024 * 1024);
+
+        if (sizeInMB > 0.5) {
+          Alert.alert('Erreur', 'L\'image est trop grande (max 0.5MB). Veuillez choisir une image plus petite.');
+          return;
+        }
+
+        setNewRecipe({ ...newRecipe, imageUrl: source });
+      }
+    });
+  };
+
   const handleSaveRecipe = async () => {
-    // Validation des champs obligatoires
     if (!newRecipe.name.trim() || !newRecipe.description.trim() || !newRecipe.ingredients.trim() || !newRecipe.steps.trim()) {
       Alert.alert('Erreur', 'Veuillez remplir le nom, la description, les ingrédients et les étapes.');
       return;
@@ -141,11 +186,15 @@ const RecipeListScreen: React.FC = () => {
     try {
       const ingredientNames = newRecipe.ingredients.split('\n').map(i => i.trim()).filter(Boolean);
       const ingredientPricesInput = newRecipe.ingredientPrices.split('\n').map(p => p.trim());
+      const ingredientQuantitiesInput = newRecipe.ingredientQuantities.split('\n').map(q => q.trim());
+      const ingredientUnitsInput = newRecipe.ingredientUnits.split('\n').map(u => u.trim());
 
-      // Validation pour les prix (Option 3: chaque ingrédient doit avoir un prix valide)
-      if (ingredientNames.length > 0 && ingredientNames.length !== ingredientPricesInput.length) {
-          Alert.alert('Erreur', 'Le nombre de prix doit correspondre au nombre d\'ingrédients. Laissez le champ des prix vide si aucun prix n\'est connu ou si certains ingrédients n\'ont pas de prix.');
-          return;
+      if (ingredientNames.length > 0 &&
+          (ingredientNames.length !== ingredientPricesInput.length ||
+           ingredientNames.length !== ingredientQuantitiesInput.length ||
+           ingredientNames.length !== ingredientUnitsInput.length)) {
+        Alert.alert('Erreur', 'Le nombre de prix, quantités et unités doit correspondre au nombre d\'ingrédients.');
+        return;
       }
 
       const parsedIngredientPrices: (number | undefined)[] = ingredientPricesInput.map(priceStr => {
@@ -153,29 +202,32 @@ const RecipeListScreen: React.FC = () => {
         return isNaN(parsedPrice) ? undefined : parsedPrice;
       });
 
-      // Vérifier si des prix sont invalides ou <= 0 (si non autorisé)
-      const hasInvalidPrice = parsedIngredientPrices.some((price, index) => {
-          // Si un ingrédient existe et son prix est défini mais n'est pas un nombre valide ou est 0 ou moins (si 0 n'est pas autorisé)
-          return ingredientNames[index] && price !== undefined && (isNaN(price) || price <= 0);
+      // Création des ingrédients avec gestion des valeurs undefined
+      const combinedIngredients: Ingredient[] = ingredientNames.map((name, index) => {
+        const ingredient: Ingredient = { name };
+
+        if (parsedIngredientPrices[index] !== undefined) {
+          ingredient.price = parsedIngredientPrices[index];
+        }
+
+        if (ingredientQuantitiesInput[index] && ingredientQuantitiesInput[index].trim() !== '') {
+          ingredient.quantity = ingredientQuantitiesInput[index].trim();
+        }
+
+        if (ingredientUnitsInput[index] && ingredientUnitsInput[index].trim() !== '') {
+          ingredient.unit = ingredientUnitsInput[index].trim();
+        }
+
+        return ingredient;
       });
 
-      if (hasInvalidPrice) {
-          Alert.alert('Erreur', 'Veuillez saisir un prix numérique valide (supérieur à 0) pour chaque ingrédient ayant un prix.');
-          return;
-      }
-      
-      // Créer un tableau d'objets Ingredient
-      const combinedIngredients: Ingredient[] = ingredientNames.map((name, index) => ({
-        name,
-        price: parsedIngredientPrices[index], // Associe le prix ou undefined
-      }));
-
+      // Préparation des données pour Firestore
       const recipeData = {
         name: newRecipe.name.trim(),
-        description: newRecipe.description.trim(), // description est maintenant obligatoire
-        ingredients: combinedIngredients, // Utilisez le nouveau tableau d'objets Ingredient
+        description: newRecipe.description.trim(),
+        ingredients: combinedIngredients,
         steps: newRecipe.steps.split('\n').map(s => s.trim()).filter(Boolean),
-        imageUrl: newRecipe.imageUrl.trim() || '',
+        imageUrl: newRecipe.imageUrl.trim() || null, // Utiliser null au lieu de chaîne vide
         createdBy: currentUser.uid,
         authorName: currentUser.displayName || 'Utilisateur inconnu',
       };
@@ -190,8 +242,18 @@ const RecipeListScreen: React.FC = () => {
         });
         Alert.alert('Succès', 'Recette ajoutée avec succès !');
       }
+
       setModalVisible(false);
-      setNewRecipe({ name: '', description: '', ingredients: '', ingredientPrices: '', steps: '', imageUrl: '' }); // Réinitialiser
+      setNewRecipe({
+        name: '',
+        description: '',
+        ingredients: '',
+        ingredientPrices: '',
+        ingredientQuantities: '',
+        ingredientUnits: '',
+        steps: '',
+        imageUrl: '',
+      });
       setEditingRecipe(null);
     } catch (e) {
       console.error("Erreur lors de l'enregistrement de la recette:", e);
@@ -221,7 +283,7 @@ const RecipeListScreen: React.FC = () => {
               await firestore().collection('recipes').doc(recipeId).delete();
               Alert.alert('Succès', 'Recette supprimée avec succès !');
             } catch (e) {
-              console.error("Erreur lors de la suppression de la recette:", e);
+              console.error('Erreur lors de la suppression de la recette:', e);
               const errorMessage = e instanceof Error ? e.message : String(e);
               Alert.alert('Erreur', `Impossible de supprimer la recette: ${errorMessage}`);
             }
@@ -233,16 +295,68 @@ const RecipeListScreen: React.FC = () => {
     );
   };
 
+  const handleShareRecipe = async (recipe: Recipe) => {
+    try {
+      const ingredientsText = recipe.ingredients.map(ing =>
+        `- ${ing.name}${ing.quantity ? ` (${ing.quantity}${ing.unit ? ` ${ing.unit}` : ''})` : ''}${ing.price ? ` - ${ing.price} FCFA` : ''}`
+      ).join('\n');
+
+      const stepsText = recipe.steps.map((step, index) => `${index + 1}. ${step}`).join('\n');
+
+      const message = `🍳 ${recipe.name}\n\n${recipe.description}\n\nIngrédients:\n${ingredientsText}\n\nÉtapes:\n${stepsText}\n\nRecette partagée via KOUISINE`;
+
+      await Share.share({
+        message,
+        title: recipe.name,
+      });
+    } catch (error) {
+      console.error('Error sharing recipe:', error);
+      Alert.alert('Erreur', 'Impossible de partager la recette');
+    }
+  };
+
+
+  const handleAddToShoppingList = async (recipe: Recipe) => {
+    if (!currentUser) {
+      Alert.alert('Erreur', 'Vous devez être connecté pour ajouter à la liste de courses.');
+      return;
+    }
+    try {
+      const uid = currentUser.uid;
+      const shoppingListRef = firestore()
+        .collection('users')
+        .doc(uid)
+        .collection('shoppingList');
+
+      await Promise.all(
+        recipe.ingredients.map(async (ingredient) => {
+          await shoppingListRef.add({
+            name: ingredient.name,
+            completed: false,
+            fromRecipe: recipe.name,
+            price: ingredient.price || null,
+            quantity: ingredient.quantity || null,
+            unit: ingredient.unit || null,
+          });
+        })
+      );
+      Alert.alert('Succès', 'Ingrédients ajoutés à la liste de courses !');
+    } catch (e) {
+      console.error("Erreur lors de l'ajout à la liste de courses:", e);
+      Alert.alert('Erreur', "Impossible d'ajouter à la liste de courses.");
+    }
+  };
+
   const renderRecipe = ({ item }: { item: Recipe }) => {
     const isCurrentUserAuthor = currentUser && item.createdBy === currentUser.uid;
 
     return (
       <TouchableOpacity
         style={styles.recipeCard}
-        onPress={() => Alert.alert(
-          item.name,
-          `Description: ${item.description}\n\nIngrédients:\n${item.ingredients.map(ing => `${ing.name}${ing.price !== undefined ? ` (${ing.price} FCFA)` : ''}`).join('\n')}\n\nÉtapes:\n${item.steps.join('\n')}`
-        )}
+        onPress={() => {
+          setSelectedRecipe(item);
+          setDetailModalVisible(true);
+        }}
         activeOpacity={0.8}
       >
         <Image
@@ -276,48 +390,6 @@ const RecipeListScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           )}
-
-          {/* Bouton pour ajouter à la liste de courses */}
-          <TouchableOpacity
-            style={{
-              backgroundColor: '#ffd700',
-              borderRadius: 10,
-              paddingVertical: 7,
-              paddingHorizontal: 15,
-              alignSelf: 'flex-start',
-              marginTop: 8,
-              marginBottom: 4,
-            }}
-            onPress={async () => {
-              if (!currentUser) {
-                Alert.alert('Erreur', 'Vous devez être connecté pour ajouter à la liste de courses.');
-                return;
-              }
-              try {
-                const uid = currentUser.uid;
-                const shoppingListRef = firestore()
-                  .collection('users')
-                  .doc(uid)
-                  .collection('shoppingList');
-
-                await Promise.all(
-                  item.ingredients.map(async (ingredient) => {
-                    await shoppingListRef.add({
-                      name: ingredient.name,
-                      completed: false,
-                      fromRecipe: item.name,
-                      price: ingredient.price || null, // Ajoute le prix ou null s'il n'existe pas
-                    });
-                  })
-                );
-                Alert.alert('Succès', 'Ingrédients ajoutés à la liste de courses !');
-              } catch (e) {
-                Alert.alert('Erreur', "Impossible d'ajouter à la liste de courses.");
-              }
-            }}
-          >
-            <Text style={{ color: '#333', fontWeight: 'bold' }}>Ajouter à la liste de courses</Text>
-          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -361,7 +433,73 @@ const RecipeListScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Modal d'ajout/édition de recette */}
+      {/* Modal pour les détails de la recette */}
+      <Modal
+        animationType="slide"
+        transparent={false}
+        visible={detailModalVisible}
+        onRequestClose={() => setDetailModalVisible(false)}
+      >
+        <ScrollView style={styles.detailContainer}>
+          {selectedRecipe && (
+            <>
+              <Image
+                source={selectedRecipe.imageUrl ? { uri: selectedRecipe.imageUrl } : require('../assets/recipe-default.png')}
+                style={styles.detailImage}
+              />
+
+              <View style={styles.detailContent}>
+                <Text style={styles.detailTitle}>{selectedRecipe.name}</Text>
+
+                <Text style={styles.detailSectionTitle}>Description</Text>
+                <Text style={styles.detailText}>{selectedRecipe.description}</Text>
+
+                <Text style={styles.detailSectionTitle}>Ingrédients</Text>
+                {selectedRecipe.ingredients.map((ingredient, index) => (
+                  <Text key={index} style={styles.detailText}>
+                    - {ingredient.name}
+                    {ingredient.quantity && ` (${ingredient.quantity}`}
+                    {ingredient.unit && ` ${ingredient.unit})`}
+                    {ingredient.price && ` - ${ingredient.price} FCFA`}
+                  </Text>
+                ))}
+
+                <Text style={styles.detailSectionTitle}>Étapes de préparation</Text>
+                {selectedRecipe.steps.map((step, index) => (
+                  <Text key={index} style={styles.detailText}>
+                    {index + 1}. {step}
+                  </Text>
+                ))}
+
+                <View style={styles.detailActions}>
+                  <TouchableOpacity
+                    style={styles.detailActionButton}
+                    onPress={() => handleAddToShoppingList(selectedRecipe)}
+                  >
+                    <Text style={styles.detailActionText}>Liste de courses</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.detailActionButton}
+                    onPress={() => handleShareRecipe(selectedRecipe)}
+                  >
+                    <Text style={styles.detailActionText}>Partager</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.detailCloseButton}
+                    onPress={() => setDetailModalVisible(false)}
+                  >
+                    <Text style={styles.detailCloseText}>Fermer</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </>
+          )}
+        </ScrollView>
+      </Modal>
+
+      {/* Modal d'édition/ajout de recette */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -372,21 +510,32 @@ const RecipeListScreen: React.FC = () => {
           style={styles.modalOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          {/* Nouveau style appliqué ici */}
           <ScrollView contentContainerStyle={styles.scrollViewContentContainer}>
-            <View style={styles.cardModal}> {/* cardModal modifié sans maxHeight */}
+            <View style={styles.cardModal}>
               <Text style={styles.modalTitle}>
                 {editingRecipe ? 'Modifier la recette' : 'Ajouter une nouvelle recette'}
               </Text>
 
-              {/* Image du plat */}
-              <Text style={styles.inputLabel}>Image du plat (URL):</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="https://exemple.com/image.jpg"
-                value={newRecipe.imageUrl}
-                onChangeText={text => setNewRecipe({ ...newRecipe, imageUrl: text })}
-              />
+              <Text style={styles.inputLabel}>Image du plat:</Text>
+              <TouchableOpacity
+                style={styles.imagePickerButton}
+                onPress={handlePickImage}
+                disabled={imageLoading}
+              >
+                {imageLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.imagePickerButtonText}>
+                    {newRecipe.imageUrl ? 'Changer l\'image' : 'Sélectionner une image'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+              {newRecipe.imageUrl ? (
+                <Image
+                  source={{ uri: newRecipe.imageUrl }}
+                  style={styles.imagePreview}
+                />
+              ) : null}
 
               <Text style={styles.inputLabel}>Nom de la recette:</Text>
               <TextInput
@@ -408,40 +557,58 @@ const RecipeListScreen: React.FC = () => {
               <Text style={styles.inputLabel}>Ingrédients (un par ligne):</Text>
               <TextInput
                 style={[styles.input, { height: 120, textAlignVertical: 'top' }]}
-                placeholder="Ex: 2 cuisses de poulet&#10;1 oignon&#10;..."
+                placeholder="Ex: 2 cuisses de poulet\n1 oignon\n..."
                 multiline
                 value={newRecipe.ingredients}
                 onChangeText={text => setNewRecipe({ ...newRecipe, ingredients: text })}
               />
 
-              {/* Champ pour les prix des ingrédients */}
-              <Text style={styles.inputLabel}>Prix des ingrédients (un par ligne, dans le même ordre que les ingrédients, laisser vide si inconnu):</Text>
+              <Text style={styles.inputLabel}>Prix des ingrédients (un par ligne, dans le même ordre):</Text>
               <TextInput
                 style={[styles.input, { height: 120, textAlignVertical: 'top' }]}
-                placeholder="Ex: 1500 (pour le poulet)&#10;200 (pour l'oignon)&#10;..."
+                placeholder="Ex: 1500 (pour le poulet)\n200 (pour l'oignon)\n..."
                 keyboardType="numeric"
                 multiline
                 value={newRecipe.ingredientPrices}
                 onChangeText={text => setNewRecipe({ ...newRecipe, ingredientPrices: text })}
               />
 
+              <Text style={styles.inputLabel}>Quantités des ingrédients (une par ligne, dans le même ordre):</Text>
+              <TextInput
+                style={[styles.input, { height: 120, textAlignVertical: 'top' }]}
+                placeholder="Ex: 2\n1\n..."
+                multiline
+                value={newRecipe.ingredientQuantities}
+                onChangeText={text => setNewRecipe({ ...newRecipe, ingredientQuantities: text })}
+              />
+
+              <Text style={styles.inputLabel}>Unités des ingrédients (une par ligne, dans le même ordre):</Text>
+              <TextInput
+                style={[styles.input, { height: 120, textAlignVertical: 'top' }]}
+                placeholder="Ex: cuisses\noignon\n..."
+                multiline
+                value={newRecipe.ingredientUnits}
+                onChangeText={text => setNewRecipe({ ...newRecipe, ingredientUnits: text })}
+              />
+
               <Text style={styles.inputLabel}>Étapes (une par ligne):</Text>
               <TextInput
                 style={[styles.input, { height: 150, textAlignVertical: 'top' }]}
-                placeholder="Ex: 1. Coupez le poulet en morceaux.&#10;2. Faites mariner le poulet.&#10;..."
+                placeholder="Ex: 1. Coupez le poulet en morceaux.\n2. Faites mariner le poulet.\n..."
                 multiline
                 value={newRecipe.steps}
                 onChangeText={text => setNewRecipe({ ...newRecipe, steps: text })}
               />
 
-              {/* Les anciens champs d'ingrédients dynamiques ont été supprimés pour simplifier l'UI */}
-              {/* Si vous souhaitez cette fonctionnalité, il faudra revoir l'approche complète */}
-
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
                   <Text style={styles.cancelButtonText}>Annuler</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.saveButton} onPress={handleSaveRecipe}>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleSaveRecipe}
+                  disabled={imageLoading}
+                >
                   <Text style={styles.saveButtonText}>Enregistrer</Text>
                 </TouchableOpacity>
               </View>
@@ -452,8 +619,6 @@ const RecipeListScreen: React.FC = () => {
     </SafeAreaView>
   );
 };
-
-export default RecipeListScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -541,11 +706,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 10,
-    flexDirection: 'row', // Pour aligner image et info
+    flexDirection: 'row',
   },
   recipeImage: {
     width: 120,
-    height: '100%', // Prendre toute la hauteur de la carte
+    height: '100%',
     borderTopLeftRadius: 15,
     borderBottomLeftRadius: 15,
     resizeMode: 'cover',
@@ -643,23 +808,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
-  // NOUVEAU STYLE POUR LE CONTENEUR DE CONTENU DE LA SCROLLVIEW
   scrollViewContentContainer: {
-    flexGrow: 1, // Permet à la ScrollView de grandir pour s'adapter au contenu
-    justifyContent: 'center', // Centre le contenu à l'intérieur de la ScrollView verticalement
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   cardModal: {
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 25,
     width: '95%',
-    // maxHeight: '90%', <-- CETTE LIGNE EST SUPPRIMÉE
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
     elevation: 20,
-    marginVertical: 20, // Ajout d'une marge verticale pour un meilleur espacement
+    marginVertical: 20,
   },
   modalTitle: {
     fontSize: 24,
@@ -686,57 +849,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
-  // Ces styles ne sont plus utilisés pour la saisie directe dans ce code,
-  // car nous utilisons des TextInputs multi-lignes pour ingrédients et prix.
-  // Ils sont gardés au cas où vous les réutilisiez pour autre chose.
-  ingredientField: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 10,
-    padding: 10,
-    backgroundColor: '#f9f9f9',
-  },
-  ingredientInput: {
-    flex: 1,
-    marginRight: 10,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    color: '#333',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  removeIngredientButton: {
-    width: 30,
-    height: 30,
+  imagePickerButton: {
+    backgroundColor: '#3498db',
     borderRadius: 15,
-    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    backgroundColor: '#dc3545',
+    marginBottom: 15,
   },
-  removeIngredientButtonText: {
+  imagePickerButtonText: {
     color: '#fff',
-    fontSize: 16,
     fontWeight: 'bold',
+    fontSize: 16,
   },
-  addIngredientButton: {
-    backgroundColor: '#28a745',
+  imagePreview: {
+    width: '100%',
+    height: 150,
     borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    alignSelf: 'flex-start',
-    marginTop: 10,
-  },
-  addIngredientButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    marginBottom: 15,
+    resizeMode: 'cover',
   },
   modalActions: {
     flexDirection: 'row',
@@ -773,4 +904,69 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  // Styles pour la vue détaillée
+  detailContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  detailImage: {
+    width: '100%',
+    height: 250,
+    resizeMode: 'cover',
+  },
+  detailContent: {
+    padding: 20,
+  },
+  detailTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#e74c3c',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  detailSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 15,
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    paddingBottom: 5,
+  },
+  detailText: {
+    fontSize: 16,
+    color: '#555',
+    marginBottom: 8,
+    lineHeight: 22,
+  },
+  detailActions: {
+    marginTop: 30,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  detailActionButton: {
+    backgroundColor: '#3498db',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  detailActionText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  detailCloseButton: {
+    backgroundColor: '#e74c3c',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  detailCloseText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
 });
+
+export default RecipeListScreen;

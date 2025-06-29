@@ -1,5 +1,5 @@
 // screen/ProfileScreen.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,17 +13,17 @@ import {
   Modal,
   TextInput,
   Dimensions,
-  Platform, // Pour les styles spécifiques à la plateforme
-  StatusBar, // Pour contrôler la barre de statut
+  Platform,
+  StatusBar,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
-import LinearGradient from 'react-native-linear-gradient'; // NÉCESSITE L'INSTALLATION: npm install react-native-linear-gradient
+import LinearGradient from 'react-native-linear-gradient';
+import ImagePicker from 'react-native-image-crop-picker';
 
 const { width } = Dimensions.get('window');
 
-// Interface pour un membre de la famille
 interface FamilyMember {
   id: string;
   name: string;
@@ -45,6 +45,14 @@ type RootStackParamList = {
   Login: undefined;
 };
 
+interface Recipe {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  [key: string]: any;
+}
+
 const ProfileScreen = () => {
   const [user, setUser] = useState<UserData | null>(null);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
@@ -55,7 +63,12 @@ const ProfileScreen = () => {
     name: '',
     relation: '',
     age: '',
+    avatar: '',
   });
+  const [uploading, setUploading] = useState(false);
+  const [selectedImageType, setSelectedImageType] = useState<'user' | 'member' | null>(null);
+  const editingMemberRef = useRef<FamilyMember | null>(null);
+  const [userRecipes, setUserRecipes] = useState<Recipe[]>([]);
 
   const navigation = useNavigation<import('@react-navigation/native').NavigationProp<RootStackParamList>>();
 
@@ -77,13 +90,13 @@ const ProfileScreen = () => {
           uid: currentUser.uid,
           email: currentUser.email || '',
           name: userData?.name || userData?.userName || userData?.displayName || 'Utilisateur',
-          avatar: userData?.avatar || userData?.photoURL,
+          avatar: userData?.avatar,
           phone: userData?.phone,
           address: userData?.address,
         });
         setLoading(false);
       }, error => {
-        console.error("Erreur lors de la récupération des données utilisateur:", error);
+        console.error('Erreur lors de la récupération des données utilisateur:', error);
         Alert.alert('Erreur', 'Impossible de charger les données de profil.');
         setLoading(false);
       });
@@ -103,15 +116,115 @@ const ProfileScreen = () => {
         });
         setFamilyMembers(members);
       }, error => {
-        console.error("Erreur lors de la récupération des membres de la famille:", error);
+        console.error('Erreur lors de la récupération des membres de la famille:', error);
         Alert.alert('Erreur', 'Impossible de charger les membres de la famille.');
       });
+
+    let unsubscribeRecipes: (() => void) | undefined;
+
+    if (currentUser) {
+      unsubscribeRecipes = firestore()
+        .collection('recipes')
+        .where('createdBy', '==', currentUser.uid)
+        .onSnapshot(snapshot => {
+          const recipes: Recipe[] = [];
+          snapshot.forEach(doc => {
+            recipes.push({
+              id: doc.id,
+              ...doc.data(),
+            } as Recipe);
+          });
+          setUserRecipes(recipes);
+        });
+    }
 
     return () => {
       userUnsubscribe();
       familyMembersUnsubscribe();
+      if (unsubscribeRecipes) unsubscribeRecipes();
     };
   }, [navigation]);
+
+  const handleImagePicker = async (type: 'user' | 'member') => {
+    try {
+      setSelectedImageType(type);
+      const image = await ImagePicker.openPicker({
+        width: 500,
+        height: 500,
+        cropping: true,
+        cropperCircleOverlay: true,
+        mediaType: 'photo',
+        compressImageQuality: 0.8,
+      });
+
+      if (type === 'user') {
+        await updateUserAvatar(image.path);
+      } else {
+        setMemberForm({ ...memberForm, avatar: image.path });
+      }
+    } catch (error) {
+      if (typeof error === 'object' && error !== null && 'code' in error && (error as any).code !== 'E_PICKER_CANCELLED') {
+        console.error('Erreur lors de la sélection de l\'image:', error);
+        Alert.alert('Erreur', 'Impossible de sélectionner l\'image');
+      }
+    }
+  };
+
+  const updateUserAvatar = async (imagePath: string) => {
+    if (!user?.uid) return;
+
+    try {
+      setUploading(true);
+      const response = await fetch(imagePath);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+
+      reader.onloadend = async () => {
+        const base64data = reader.result as string;
+
+        await firestore()
+          .collection('users')
+          .doc(user.uid)
+          .update({ avatar: base64data });
+
+        setUploading(false);
+      };
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de l\'avatar:', error);
+      setUploading(false);
+      Alert.alert('Erreur', 'Impossible de mettre à jour la photo de profil');
+    }
+  };
+
+  const updateMemberAvatar = async (memberId: string, imagePath: string) => {
+    if (!user?.uid) return;
+
+    try {
+      setUploading(true);
+      const response = await fetch(imagePath);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+
+      reader.onloadend = async () => {
+        const base64data = reader.result as string;
+
+        await firestore()
+          .collection('users')
+          .doc(user.uid)
+          .collection('familyMembers')
+          .doc(memberId)
+          .update({ avatar: base64data });
+
+        setUploading(false);
+      };
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de l\'avatar:', error);
+      setUploading(false);
+      Alert.alert('Erreur', 'Impossible de mettre à jour la photo du membre');
+    }
+  };
 
   const handleLogout = async () => {
     Alert.alert(
@@ -130,8 +243,8 @@ const ProfileScreen = () => {
                 routes: [{ name: 'Login' }],
               });
             } catch (e) {
-              console.error("Erreur lors de la déconnexion:", e);
-              Alert.alert('Erreur', "Impossible de se déconnecter.");
+              console.error('Erreur lors de la déconnexion:', e);
+              Alert.alert('Erreur', 'Impossible de se déconnecter.');
             }
           },
         },
@@ -141,16 +254,18 @@ const ProfileScreen = () => {
 
   const openAddMemberModal = () => {
     setEditingMember(null);
-    setMemberForm({ name: '', relation: '', age: '' });
+    setMemberForm({ name: '', relation: '', age: '', avatar: '' });
     setModalVisible(true);
   };
 
   const openEditMemberModal = (member: FamilyMember) => {
+    editingMemberRef.current = member;
     setEditingMember(member);
     setMemberForm({
       name: member.name,
       relation: member.relation,
       age: member.age?.toString() || '',
+      avatar: member.avatar || '',
     });
     setModalVisible(true);
   };
@@ -165,11 +280,26 @@ const ProfileScreen = () => {
     if (!uid) return;
 
     try {
-      const memberData = {
+      const memberData: {
+        name: string;
+        relation: string;
+        age?: number;
+        avatar?: string;
+      } = {
         name: memberForm.name.trim(),
         relation: memberForm.relation,
         age: memberForm.age ? parseInt(memberForm.age) : undefined,
       };
+
+      // Si c'est une modification et qu'il y a une nouvelle image
+      if (editingMember && memberForm.avatar && memberForm.avatar !== editingMember.avatar) {
+        await updateMemberAvatar(editingMember.id, memberForm.avatar);
+      }
+
+      // Si c'est une création et qu'il y a une image
+      if (!editingMember && memberForm.avatar) {
+        memberData.avatar = memberForm.avatar;
+      }
 
       if (editingMember) {
         await firestore()
@@ -187,8 +317,7 @@ const ProfileScreen = () => {
       }
 
       setModalVisible(false);
-      setMemberForm({ name: '', relation: '', age: '' });
-      Alert.alert('Succès', 'Membre enregistré avec succès !');
+      setMemberForm({ name: '', relation: '', age: '', avatar: '' });
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
       Alert.alert('Erreur', 'Impossible de sauvegarder le membre.');
@@ -225,11 +354,16 @@ const ProfileScreen = () => {
     );
   };
 
-  // --- Rendu d'un élément de membre de la famille (amélioré) ---
   const renderFamilyMemberItem = ({ item }: { item: FamilyMember }) => (
     <View style={styles.familyMemberCard}>
       <View style={styles.memberLeft}>
-        <View style={styles.avatarWrapper}>
+        <TouchableOpacity
+          style={styles.avatarWrapper}
+          onPress={() => {
+            editingMemberRef.current = item;
+            handleImagePicker('member');
+          }}
+        >
           <Image
             source={
               item.avatar
@@ -238,12 +372,15 @@ const ProfileScreen = () => {
             }
             style={styles.familyMemberAvatar}
           />
+          <View style={styles.avatarEditBadge}>
+            <Text style={{fontSize: 14, color: '#fff'}}>📷</Text>
+          </View>
           <View style={styles.relationBadge}>
             <Text style={styles.relationBadgeText}>
               {item.relation ? item.relation.charAt(0).toUpperCase() : '?'}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
         <View style={styles.memberInfo}>
           <Text style={styles.memberName}>{item.name}</Text>
           <Text style={styles.memberRelation}>
@@ -256,13 +393,13 @@ const ProfileScreen = () => {
           style={styles.editButton}
           onPress={() => openEditMemberModal(item)}
         >
-          <Text style={styles.actionIcon}>✏️</Text>
+          <Text style={{fontSize: 18}}>✏️</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() => handleDeleteMember(item)}
         >
-          <Text style={styles.actionIcon}>🗑️</Text>
+          <Text style={{fontSize: 18}}>🗑️</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -283,75 +420,69 @@ const ProfileScreen = () => {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Header avec gradient de couleur */}
         <LinearGradient
-          colors={['#4A90E2', '#357ABD']} // Un gradient bleu élégant
+          colors={['#4A90E2', '#357ABD']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.header}
         >
           <View style={styles.headerContent}>
-            <View style={styles.profileImageContainer}>
-              <Image
-                source={
-                  user?.avatar
-                    ? { uri: user.avatar }
-                    : require('../assets/avatar-default.png')
-                }
-                style={styles.profileImage}
-              />
-              {/* Indicateur de statut (peut être utilisé pour 'en ligne' ou autre) */}
+            <TouchableOpacity
+              style={styles.profileImageContainer}
+              onPress={() => handleImagePicker('user')}
+              disabled={uploading}
+            >
+              {uploading && selectedImageType === 'user' ? (
+                <View style={styles.avatarLoading}>
+                  <ActivityIndicator size="small" color="#fff" />
+                </View>
+              ) : (
+                <Image
+                  source={
+                    user?.avatar
+                      ? { uri: user.avatar }
+                      : require('../assets/avatar-default.png')
+                  }
+                  style={styles.profileImage}
+                />
+              )}
+              <View style={styles.avatarEditBadge}>
+                <Text style={{fontSize: 16, color: '#fff'}}>📷</Text>
+              </View>
               <View style={styles.statusIndicator} />
-            </View>
+            </TouchableOpacity>
             <Text style={styles.userName}>{user?.name || 'Utilisateur'}</Text>
             <Text style={styles.userEmail}>{user?.email}</Text>
             {user?.phone && (
-              <Text style={styles.userInfo}>📞 {user.phone}</Text>
+              <Text style={styles.userInfo}>
+                <Text style={{fontSize: 14}}>📞</Text> {user.phone}
+              </Text>
             )}
             {user?.address && (
-              <Text style={styles.userInfo}>📍 {user.address}</Text>
+              <Text style={styles.userInfo}>
+                <Text style={{fontSize: 14}}>📍</Text> {user.address}
+              </Text>
             )}
-            <TouchableOpacity style={styles.editProfileButton}>
-              <Text style={styles.editProfileButtonText}>Modifier le profil</Text>
-            </TouchableOpacity>
           </View>
         </LinearGradient>
-
-        {/* Section Informations personnelles (optionnel si vous voulez la rajouter) */}
-        {/* <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Informations Personnelles</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Nom :</Text>
-            <Text style={styles.infoValue}>{user?.name || 'Non défini'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Email :</Text>
-            <Text style={styles.infoValue}>{user?.email}</Text>
-          </View>
-          {user?.phone && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Téléphone :</Text>
-              <Text style={styles.infoValue}>{user.phone}</Text>
-            </View>
-          )}
-          {user?.address && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Adresse :</Text>
-              <Text style={styles.infoValue}>{user.address}</Text>
-            </View>
-          )}
-        </View> */}
 
         {/* Section Membres de la famille */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>👨‍👩‍👧‍👦 Ma Famille</Text>
-            <TouchableOpacity style={styles.addButton} onPress={openAddMemberModal}>
-              <Text style={styles.addButtonText}>+ Ajouter</Text>
+            <Text style={styles.sectionTitle}>
+              <Text style={{fontSize: 22}}>👨‍👩‍👧‍👦</Text> Ma Famille
+            </Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={openAddMemberModal}
+            >
+              <Text style={{fontSize: 20, color: '#fff'}}>➕</Text>
+              <Text style={styles.addButtonText}>Ajouter</Text>
             </TouchableOpacity>
           </View>
 
           {familyMembers.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateIcon}>👥</Text>
+              <Text style={{fontSize: 60}}>👨‍👩‍👧‍👦</Text>
               <Text style={styles.emptyStateTitle}>Aucun membre ajouté</Text>
               <Text style={styles.emptyStateSubtitle}>
                 Commencez par ajouter les membres de votre famille ici.
@@ -362,20 +493,66 @@ const ProfileScreen = () => {
               data={familyMembers}
               keyExtractor={(item) => item.id}
               renderItem={renderFamilyMemberItem}
-              scrollEnabled={false} // Désactiver le défilement de FlatList car il est dans un ScrollView parent
+              scrollEnabled={false}
               showsVerticalScrollIndicator={false}
-              ItemSeparatorComponent={() => <View style={{ height: 12 }} />} // Espacement entre les cartes
+              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+            />
+          )}
+        </View>
+
+        {/* Section Recettes */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            <Text style={{fontSize: 22}}>🍳</Text> Mes recettes
+          </Text>
+          {userRecipes.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={{fontSize: 40}}>🍽️</Text>
+              <Text style={styles.emptyStateTitle}>Aucune recette créée</Text>
+              <Text style={styles.emptyStateSubtitle}>
+                Vous n'avez pas encore ajouté de recette.
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={userRecipes}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 12,
+                  backgroundColor: '#f8f8f8',
+                  borderRadius: 12,
+                  padding: 10,
+                }}>
+                  <Image
+                    source={item.imageUrl ? { uri: item.imageUrl } : require('../assets/recipe-default.png')}
+                    style={{ width: 50, height: 50, borderRadius: 8, marginRight: 12 }}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontWeight: 'bold', fontSize: 16 }}>{item.name}</Text>
+                    <Text numberOfLines={1} style={{ color: '#888', fontSize: 13 }}>{item.description}</Text>
+                  </View>
+                </View>
+              )}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
             />
           )}
         </View>
 
         {/* Bouton de déconnexion */}
         <View style={styles.section}>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutText}>🚪 Se déconnecter</Text>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={handleLogout}
+          >
+            <Text style={{fontSize: 20, color: '#fff'}}>🚪</Text>
+            <Text style={styles.logoutText}>Se déconnecter</Text>
           </TouchableOpacity>
         </View>
-        <View style={{ height: 40 }} />{/* Espace pour le bas du scroll */}
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Modal pour ajouter/modifier un membre */}
@@ -389,17 +566,45 @@ const ProfileScreen = () => {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingMember ? '✏️ Modifier le membre' : '➕ Ajouter un membre'}
+                {editingMember ? 'Modifier le membre' : 'Ajouter un membre'}
               </Text>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
               >
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Text style={{fontSize: 24, color: '#7f8c8d'}}>✖️</Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.formContainer}>
+              <View style={styles.avatarPickerContainer}>
+                <TouchableOpacity
+                  onPress={() => handleImagePicker('member')}
+                  disabled={uploading && selectedImageType === 'member'}
+                >
+                  {uploading && selectedImageType === 'member' ? (
+                    <View style={styles.avatarLoading}>
+                      <ActivityIndicator size="small" color="#fff" />
+                    </View>
+                  ) : (
+                    <Image
+                      source={
+                        memberForm.avatar
+                          ? { uri: memberForm.avatar }
+                          : require('../assets/avatar-default.png')
+                      }
+                      style={styles.modalAvatar}
+                    />
+                  )}
+                  <View style={styles.avatarEditBadge}>
+                    <Text style={{fontSize: 14, color: '#fff'}}>📷</Text>
+                  </View>
+                </TouchableOpacity>
+                <Text style={styles.avatarPickerText}>
+                  {memberForm.avatar ? 'Changer la photo' : 'Ajouter une photo'}
+                </Text>
+              </View>
+
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Nom complet *</Text>
                 <TextInput
@@ -413,28 +618,30 @@ const ProfileScreen = () => {
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Relation *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.relationContainer}>
-                    {relations.map((relation) => (
-                      <TouchableOpacity
-                        key={relation}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.relationContainer}
+                >
+                  {relations.map((relation) => (
+                    <TouchableOpacity
+                      key={relation}
+                      style={[
+                        styles.relationChip,
+                        memberForm.relation === relation && styles.relationChipSelected,
+                      ]}
+                      onPress={() => setMemberForm({ ...memberForm, relation })}
+                    >
+                      <Text
                         style={[
-                          styles.relationChip,
-                          memberForm.relation === relation && styles.relationChipSelected,
+                          styles.relationChipText,
+                          memberForm.relation === relation && styles.relationChipTextSelected,
                         ]}
-                        onPress={() => setMemberForm({ ...memberForm, relation })}
                       >
-                        <Text
-                          style={[
-                            styles.relationChipText,
-                            memberForm.relation === relation && styles.relationChipTextSelected,
-                          ]}
-                        >
-                          {relation}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                        {relation}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </ScrollView>
               </View>
 
@@ -458,7 +665,11 @@ const ProfileScreen = () => {
               >
                 <Text style={styles.cancelButtonText}>Annuler</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={handleSaveMember}>
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSaveMember}
+                disabled={!memberForm.name || !memberForm.relation}
+              >
                 <Text style={styles.saveButtonText}>
                   {editingMember ? 'Modifier' : 'Ajouter'}
                 </Text>
@@ -471,12 +682,10 @@ const ProfileScreen = () => {
   );
 };
 
-export default ProfileScreen;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f7fa', // Fond général légèrement gris
+    backgroundColor: '#f5f7fa',
   },
   loadingContainer: {
     flex: 1,
@@ -490,13 +699,11 @@ const styles = StyleSheet.create({
     color: '#4A90E2',
     fontWeight: '500',
   },
-  // --- Header Section ---
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 20, // Ajustement pour la barre de statut iOS
+    paddingTop: Platform.OS === 'ios' ? 60 : 20,
     paddingBottom: 40,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    // Les styles de shadow sont définis par LinearGradient maintenant
   },
   headerContent: {
     alignItems: 'center',
@@ -511,8 +718,32 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     borderWidth: 4,
-    borderColor: '#fff', // Bordure blanche autour de l'avatar
-    backgroundColor: '#e0e0e0', // Fallback si l'image n'est pas chargée
+    borderColor: '#fff',
+    backgroundColor: '#e0e0e0',
+  },
+  avatarLoading: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#4A90E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+    zIndex: 2,
   },
   statusIndicator: {
     position: 'absolute',
@@ -521,7 +752,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#4CAF50', // Vert vif pour le statut (en ligne)
+    backgroundColor: '#4CAF50',
     borderWidth: 3,
     borderColor: '#fff',
   },
@@ -542,20 +773,9 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     marginVertical: 2,
     fontWeight: '500',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  editProfileButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)', // Bouton transparent sur le gradient
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    marginTop: 15,
-  },
-  editProfileButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  // --- Section Générique pour les cartes ---
   section: {
     marginHorizontal: 20,
     marginTop: 20,
@@ -563,7 +783,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 }, // Ombre plus prononcée pour la profondeur
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 5,
@@ -577,13 +797,15 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#2c3e50', // Gris foncé pour les titres
+    color: '#2c3e50',
   },
   addButton: {
-    backgroundColor: '#4A90E2', // Couleur principale
+    backgroundColor: '#4A90E2',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     shadowColor: '#4A90E2',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -594,17 +816,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     fontSize: 14,
+    marginLeft: 6,
   },
-  // --- Family Member Card ---
   familyMemberCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fcfcfc', // Fond très clair pour les cartes de membres
+    backgroundColor: '#fcfcfc',
     padding: 16,
     borderRadius: 16,
-    borderLeftWidth: 5, // Bordure gauche plus épaisse
-    borderLeftColor: '#A8DADC', // Couleur pastel pour la bordure (peut être dynamique selon la relation)
+    borderLeftWidth: 5,
+    borderLeftColor: '#A8DADC',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -621,7 +843,7 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   familyMemberAvatar: {
-    width: 55, // Taille légèrement augmentée
+    width: 55,
     height: 55,
     borderRadius: 27.5,
     backgroundColor: '#e0e0e0',
@@ -630,10 +852,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -4,
     right: -4,
-    width: 24, // Badge légèrement plus grand
+    width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#4A90E2', // Couleur principale
+    backgroundColor: '#4A90E2',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -649,7 +871,7 @@ const styles = StyleSheet.create({
   },
   memberName: {
     fontSize: 18,
-    fontWeight: '700', // Plus gras
+    fontWeight: '700',
     color: '#2c3e50',
     marginBottom: 4,
   },
@@ -661,37 +883,28 @@ const styles = StyleSheet.create({
   memberActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8, // Espacement entre les icônes
+    gap: 8,
   },
   editButton: {
     padding: 8,
-    borderRadius: 20, // Rond
-    backgroundColor: '#EBF5FB', // Fond léger pour les actions
+    borderRadius: 20,
+    backgroundColor: '#EBF5FB',
   },
   deleteButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: '#FDEDEC', // Fond rouge très léger pour supprimer
+    backgroundColor: '#FDEDEC',
   },
-  actionIcon: {
-    fontSize: 18,
-    color: '#34495e', // Couleur neutre pour les icônes d'action
-  },
-  // --- Empty State ---
   emptyState: {
     alignItems: 'center',
     paddingVertical: 50,
-  },
-  emptyStateIcon: {
-    fontSize: 60, // Grande icône
-    marginBottom: 20,
-    opacity: 0.6,
   },
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#2c3e50',
     marginBottom: 10,
+    marginTop: 10,
   },
   emptyStateSubtitle: {
     fontSize: 15,
@@ -700,13 +913,15 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     paddingHorizontal: 20,
   },
-  // --- Logout Button ---
   logoutButton: {
-    backgroundColor: '#e74c3c', // Rouge pour déconnexion
+    backgroundColor: '#e74c3c',
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',
     marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
     shadowColor: '#e74c3c',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
@@ -718,19 +933,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 17,
   },
-  // --- Modal Styles ---
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Fond plus sombre pour la modal
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
     backgroundColor: '#fff',
     margin: 20,
-    borderRadius: 25, // Rayon plus grand
+    borderRadius: 25,
     width: width - 40,
-    maxHeight: '85%', // Un peu plus grand
+    maxHeight: '85%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
@@ -742,8 +956,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    borderBottomWidth: StyleSheet.hairlineWidth, // Ligne très fine
-    borderBottomColor: '#e0e0e0', // Gris clair
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e0e0e0',
   },
   modalTitle: {
     fontSize: 22,
@@ -751,52 +965,63 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
   },
   closeButton: {
-    width: 36, // Taille légèrement plus grande
+    width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f0f2f5', // Fond léger pour le bouton fermer
     justifyContent: 'center',
     alignItems: 'center',
   },
-  closeButtonText: {
-    fontSize: 20,
-    color: '#7f8c8d',
-    fontWeight: '600',
-  },
   formContainer: {
-    padding: 25, // Padding plus grand
+    padding: 25,
+  },
+  avatarPickerContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalAvatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#e0e0e0',
+    marginBottom: 10,
+  },
+  avatarPickerText: {
+    fontSize: 14,
+    color: '#4A90E2',
+    fontWeight: '500',
   },
   inputGroup: {
-    marginBottom: 25, // Plus d'espace entre les groupes d'input
+    marginBottom: 25,
   },
   inputLabel: {
     fontSize: 16,
-    fontWeight: '700', // Plus gras
+    fontWeight: '700',
     color: '#2c3e50',
     marginBottom: 10,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#dcdcdc', // Bordure plus subtile
-    borderRadius: 15, // Rayon plus grand
+    borderColor: '#dcdcdc',
+    borderRadius: 15,
     paddingHorizontal: 18,
-    paddingVertical: 14, // Padding vertical plus grand
+    paddingVertical: 14,
     fontSize: 16,
-    backgroundColor: '#fdfdfd', // Fond presque blanc
+    backgroundColor: '#fdfdfd',
     color: '#34495e',
   },
   relationContainer: {
     flexDirection: 'row',
-    paddingVertical: 4, // Un peu d'espace si les chips sont trop serrés
+    paddingVertical: 4,
+    paddingRight: 20,
   },
   relationChip: {
     paddingHorizontal: 18,
     paddingVertical: 10,
-    borderRadius: 25, // Bien rond
-    backgroundColor: '#f0f2f5', // Gris clair
+    borderRadius: 25,
+    backgroundColor: '#f0f2f5',
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    marginRight: 10, // Espacement entre les chips
+    marginRight: 10,
   },
   relationChipSelected: {
     backgroundColor: '#4A90E2',
@@ -813,17 +1038,17 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     flexDirection: 'row',
-    justifyContent: 'space-around', // Espacement équitable
+    justifyContent: 'space-around',
     padding: 20,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e0e0e0',
-    gap: 15, // Espace entre les boutons
+    gap: 15,
   },
   cancelButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 15,
-    backgroundColor: '#eef2f5', // Gris très clair
+    backgroundColor: '#eef2f5',
     alignItems: 'center',
   },
   cancelButtonText: {
@@ -835,13 +1060,16 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 15,
-    backgroundColor: '#4A90E2', // Couleur principale
+    backgroundColor: '#4A90E2',
     alignItems: 'center',
-    shadowColor: '#4A90E2', // Ombre sur le bouton sauvegarder
+    shadowColor: '#4A90E2',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 4,
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#cccccc',
   },
   saveButtonText: {
     fontSize: 16,
@@ -849,3 +1077,5 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
+export default ProfileScreen;
+
